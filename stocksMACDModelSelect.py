@@ -40,7 +40,7 @@ def MACD_Model_Select():
                 DIFF_list.append(DIFF)
                 DEA_9_list.append(DEA_9)
                 MACD_list.append(MACD)
-            if((DIFF_list[-2]<DEA_9_list[-2])&(DIFF_list[-1]>DEA_9_list[-1])&(DIFF_list[-1]<0)&(DEA_9_list[-1]<0)):
+            if((DIFF_list[-2]<DEA_9_list[-2]) and (DIFF_list[-1]>DEA_9_list[-1]) and (DIFF_list[-1]<0) and (DEA_9_list[-1]<0)):
                 if(os.path.exists(resultfile_path)):
                     with open(resultfile_path, 'w') as fp:
                         row0 = "股票名称,"
