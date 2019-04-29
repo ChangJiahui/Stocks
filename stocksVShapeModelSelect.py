@@ -20,7 +20,7 @@ def vshape_Model_Select():
             reader = csv.reader(fp)
             stock_data_list = list(reader)
             try:
-                if(float(stock_data_list[1][9])<0):
+                if((float(stock_data_list[1][9])<0) & (flaot(stock_data_list[1][10])<2*flaot(stock_data_list[2][10]))):
                     continue
             except:
                 continue
