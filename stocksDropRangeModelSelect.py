@@ -28,6 +28,15 @@ def drop_Model_Select():
                 except:
                     break
             if(dropcounter > 0):
+                droprange2 = 0
+                if(len(stock_data_list)>(dropcounter*3+1)):
+                    for ii in range(1, dropcounter*3+1):
+                        try:
+                           droprange2 += float(stock_data_list[ii][9])
+                        except:
+                           continue
+                if(droprange2>=0):
+                    continue
                 droprange = 0
                 for ii in range(1, dropcounter+1):
                     droprange += float(stock_data_list[ii][9])
