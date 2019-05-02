@@ -11,8 +11,8 @@ end_time = "20190430"
 
 root_path = "D:\\Workspace\\Python\\Stocks"
 stockinfo_path = os.path.join(root_path, "Data", "stock_info.txt")
-stockdata_path = os.path.join(root_path, "Data", "stock_data")
-indexdata_path = os.path.join(root_path, "Data", "index_data")
+stockdata_path = os.path.join(root_path, "Data", "stock_data_history")
+indexdata_path = os.path.join(root_path, "Data", "index_data_history")
 
 
 def get_index_data():
@@ -39,7 +39,7 @@ def get_index_data():
                     stock_data_list = list(csv.reader(fp))
                     for ii in reversed(range(1, len(stock_data_list))):
                         if(float(stock_data_list[ii][3])==0):
-                            print(stock_data_list[ii])
+#                            print(stock_data_list[ii])
                             stock_data_list.pop(ii)
                     fp.seek(0)
                     for ii in range(len(stock_data_list)):
@@ -123,7 +123,7 @@ def get_stock_data():
                             stock_data_list = list(csv.reader(fp))
                             for ii in reversed(range(1, len(stock_data_list))):
                                 if(float(stock_data_list[ii][3])==0):
-                                    print(stock_data_list[ii])
+#                                    print(stock_data_list[ii])
                                     stock_data_list.pop(ii)
                             fp.seek(0)
                             for ii in range(len(stock_data_list)):

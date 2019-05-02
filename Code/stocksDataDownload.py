@@ -5,7 +5,7 @@ import time
 import os
 import csv
 
-start_time = "20180101"
+start_time = "20190101"
 end_time = time.strftime('%Y%m%d',time.localtime(time.time()))
 #end_time = "20190430"
 
@@ -39,7 +39,7 @@ def get_index_data():
                     stock_data_list = list(csv.reader(fp))
                     for ii in reversed(range(1, len(stock_data_list))):
                         if(float(stock_data_list[ii][3])==0):
-                            print(stock_data_list[ii])
+#                            print(stock_data_list[ii])
                             stock_data_list.pop(ii)
                     fp.seek(0)
                     for ii in range(len(stock_data_list)):
@@ -123,7 +123,7 @@ def get_stock_data():
                             stock_data_list = list(csv.reader(fp))
                             for ii in reversed(range(1, len(stock_data_list))):
                                 if(float(stock_data_list[ii][3])==0):
-                                    print(stock_data_list[ii])
+#                                    print(stock_data_list[ii])
                                     stock_data_list.pop(ii)
                             fp.seek(0)
                             for ii in range(len(stock_data_list)):
