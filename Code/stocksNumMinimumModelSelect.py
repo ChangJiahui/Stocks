@@ -11,7 +11,7 @@ stockdata_path = os.path.join(root_path, "Data", "stock_data")
 resultfile_path = os.path.join(root_path, "Result", "minimum_Model_Select_Result.csv")
 
 def minimum_Model_Select():
-    with open("minimum_Model_Select_Result.csv", 'w') as fp:
+    with open(resultfile_path, 'w') as fp:
         fp.write("股票名称,最低价天数,收盘价天数," + "\n")
     filenames = os.listdir(stockdata_path)
     for filename in filenames:

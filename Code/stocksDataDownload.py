@@ -35,13 +35,14 @@ def get_index_data():
                     for chunk in data.iter_content(chunk_size):
                         fp.write(chunk)
                     print("{}-{}\t{}\t数据已经下载完成".format(start_time, end_time, stock_info))
-                with open(os.path.join(stockdata_path,'{}.csv'.format(stock_info)), 'r+') as fp:                                 #保存数据
+                stock_data_list = []
+                with open(os.path.join(indexdata_path,'{}.csv'.format(stock_info)), 'r') as fp:                                 #保存数据
                     stock_data_list = list(csv.reader(fp))
                     for ii in reversed(range(1, len(stock_data_list))):
                         if(float(stock_data_list[ii][3])==0):
 #                            print(stock_data_list[ii])
                             stock_data_list.pop(ii)
-                    fp.seek(0)
+                with open(os.path.join(indexdata_path,'{}.csv'.format(stock_info)), 'w') as fp:                                 #保存数据
                     for ii in range(len(stock_data_list)):
                         fp.write(','.join(stock_data_list[ii])+'\n')
         except Exception as e:
@@ -119,13 +120,14 @@ def get_stock_data():
                             chunk_size = 100000
                             for chunk in data.iter_content(chunk_size):
                                 fp.write(chunk)
-                        with open(os.path.join(stockdata_path,'{}.csv'.format(stock_info)), 'r+') as fp:                                 #保存数据
+                        print("{}-{}\t{}\t数据已经下载完成".format(start_time, end_time, stock_info))
+                        with open(os.path.join(stockdata_path,'{}.csv'.format(stock_info)), 'r') as fp:                                 #保存数据
                             stock_data_list = list(csv.reader(fp))
                             for ii in reversed(range(1, len(stock_data_list))):
                                 if(float(stock_data_list[ii][3])==0):
 #                                    print(stock_data_list[ii])
                                     stock_data_list.pop(ii)
-                            fp.seek(0)
+                        with open(os.path.join(stockdata_path,'{}.csv'.format(stock_info)), 'w') as fp:                                 #保存数据
                             for ii in range(len(stock_data_list)):
                                 fp.write(','.join(stock_data_list[ii])+'\n')
                 except Exception as e:

@@ -25,6 +25,9 @@ def get_AHdata():
             continue
         if(str(AHitem["SYMBOL"]).format(5)=="02922"):
             continue
+#        print(str(AHitem["AH"]["ASTOCKNAME"]))
+        if(float(AHitem["PRICE"])==0):
+            continue
         AHdataNew = [str(AHitem["AH"]["ASTOCKNAME"]), str(AHitem["AH"]["A_SYMBOL"]).format(6), str(AHitem["AH"]["ASTOCKCODE"]).format(7),
             str(AHitem["AH"]["A_PRICE"]), str(AHitem["AH"]["A_PERCENT"]*100), str(AHitem["SYMBOL"]).format(5), str(AHitem["SCHIDESP"]), 
             str(AHitem["PRICE"]), str(AHitem["PERCENT"]*100), str(AHitem["AH"]["PREMIUMRATE"])]
@@ -34,6 +37,8 @@ def get_AHdata():
     if(os.path.exists(os.path.join(AHdataHistory_path, "new.csv"))):
         with open(os.path.join(AHdataHistory_path, "new.csv"), "r") as fp:
             AHdataOld_list = list(csv.reader(fp))[1:]
+#        print("Here")
+#        print(AHdataOld_list)
         IsADataChange = False
         IsHDataChange = False
         for AHdataNew in AHdataNew_list:
@@ -43,6 +48,9 @@ def get_AHdata():
                         IsADataChange = True
                     if(float(AHdataNew[8])!=float(AHdataOld[8])):
                         IsHDataChange = True
+        if((AHdataOld_list==[]) and (AHdataNew_list!=[])):
+            IsADataChange = True
+            IsHDataChange = True
         if(not IsADataChange):
             for ii in range(len(AHdataNew_list)):
                 AHdataNew_list[ii][4] = 0
