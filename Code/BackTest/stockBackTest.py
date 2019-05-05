@@ -29,7 +29,7 @@ def MACD_Model_BackTest():
             isBuy = False
             buy_date = ""
             buy_price = 0
-            for ii in reversed(range(1, len(stock_data_list)-1)):
+            for ii in reversed(range(2, len(stock_data_list)-1)):
                 print(stock_data_list[ii])
                 closing_price = float(stock_data_list[ii][3])
                 EMA_12 = 11/13*EMA_12_list[-1] + 2/13*closing_price
