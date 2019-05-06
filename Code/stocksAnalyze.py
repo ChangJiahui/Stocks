@@ -2,7 +2,6 @@
 # stockdata_list 1行15列数据  0日期,1股票代码,2名称,3收盘价,4最高价,5最低价,6开盘价,7前收盘,8涨跌额,9涨跌幅,10换手率,11成交量,12成交金额,13总市值,14流通市值
 
 
-
 import requests
 import random
 from bs4 import BeautifulSoup as bs
@@ -10,16 +9,21 @@ import time
 import os
 import csv
 import json
+import math
+import numpy as np
 
-start_time = "19900101"
-#end_time = time.strftime('%Y%m%d',time.localtime(time.time()))
-end_time = "20190430"
+start_time = "20180101"
+end_time = time.strftime('%Y%m%d',time.localtime(time.time()))
+#end_time = "20190430"
 
 root_path = "D:\\Workspace\\Python\\Stocks"
 stockinfo_file = os.path.join(root_path, "Data", "stock_info.txt")
 stockdata_path = os.path.join(root_path, "Data", "stock_data")
 indexdata_path = os.path.join(root_path, "Data", "index_data")
-resultdata_path = os.path.join(root_path, "Result")
+resultdata_path = os.path.join(root_path, "Result", end_time)
+if(not os.path.exists(resultdata_path)):
+    os.mkdir(resultdata_path)
+
 
 
 def read_csvfile(filename):
@@ -48,7 +52,7 @@ def get_htmltext(url):
         try:
 #            response = requests.get(url, headers=headers)
             response = requests.get(url)
-            print("Get Successfully: " + url)
+#            print("Get Successfully: " + url)
             if(response.status_code!=200):
                 return ""
             break
@@ -84,7 +88,7 @@ def download_file(url, filename):
             chunk_size = 100000
             for chunk in data.iter_content(chunk_size):
                 fp.write(chunk)
-        print("Download Successfully: " + url)
+#        print("Download Successfully: " + url)
         return True
     except Exception as e:
         print(e)
@@ -109,7 +113,7 @@ def get_163data(stock_code_new, start_time, end_time, filename):
 def check_stockdata(filename):
     title, stockdata_list = read_csvfile(filename)
     for ii in reversed(range(len(stockdata_list))):
-        if((stockdata_list[ii][8]=="None") or (stockdata_list[ii][9]=="None") or (float(stockdata_list[ii][3])==0)):
+        if((stockdata_list[ii][8]=="None") or (stockdata_list[ii][9]=="None") or (stockdata_list[ii][10]=="None") or (float(stockdata_list[ii][3])==0)):
             stockdata_list.pop(ii)
     for ii in range(1, len(stockdata_list)-1):
         if(float(stockdata_list[ii-1][7])!=float(stockdata_list[ii][3])):
@@ -131,7 +135,7 @@ def get_stockinfo():
     else:
         soup = bs(response, 'lxml')
         all_ul = soup.find('div', id='quotesearch').find_all('ul')   # 获取两个ul 标签数据
-        print("开始生成股票列表……")
+#        print("开始生成股票列表……")
         with open(stockinfo_file, 'w') as fp:
             for ul in all_ul:
                 ull_a = ul.find_all('a')
@@ -147,7 +151,7 @@ def get_stockinfo():
                     	stock_code_new = '0' + stock_code
                     if(detect_163data('http://quotes.money.163.com/trade/lsjysj_{}.html'.format(stock_code))):
                         fp.write(stock_name+"_"+stock_code_new+"\n")
-                print("下载股票列表……")
+#                print("完成股票列表更新……")
 
 
 def get_index_data():
@@ -160,7 +164,7 @@ def get_index_data():
             isMarketOpen = True
             if(get_163data(stock_code_new, start_time, end_time, indexdata_file)):
                 check_stockdata(indexdata_file)
-                print("{}-{}\t{}\t数据已经下载完成".format(start_time, end_time, stock_info))
+#                print("{}-{}\t{}\t数据已经下载完成".format(start_time, end_time, stock_info))
             else:
                 isMarketOpen = False
         else:
@@ -177,7 +181,7 @@ def get_stockdata():
                 stockdata_file = os.path.join(stockdata_path,'{}.csv'.format(stock_info))
                 if(get_163data(stock_code_new, start_time, end_time, stockdata_file)):
                     check_stockdata(stockdata_file)
-                    print("{}-{}\t{}\t数据已经下载完成".format(start_time, end_time, stock_info))
+#                    print("{}-{}\t{}\t数据已经下载完成".format(start_time, end_time, stock_info))
 
 
 def drop_Model_Select():
@@ -277,7 +281,7 @@ def lagging_Model_Select():
 
 def MACD_Model_Select():
     resultfile_path = os.path.join(resultdata_path, "MACD_Model_Select_Result.csv")
-    title = ["股票名称"]
+    title = ["股票名称", "估算MACD贯穿天数"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
@@ -295,8 +299,50 @@ def MACD_Model_Select():
             DIFF_list.append(DIFF)
             DEA_9_list.append(DEA_9)
             MACD_list.append((DIFF-DEA_9)*2)
-        if((MACD_list[-2]<0) and (MACD_list[-1]>0)):
-            resultdata_list.append([filename])
+        if((MACD_list[-2]<0) and (MACD_list[-1]>MACD_list[-2]) and (DEA_9_list[-2]<0)):
+            resultdata_list.append([filename, math.ceil(MACD_list[-1]/(MACD_list[-2]-MACD_list[-1]))])
+    write_csvfile(resultfile_path, title, resultdata_list)
+
+
+def obv_Model_Select():
+    resultfile_path = os.path.join(resultdata_path, "obv_Model_Select_Result.csv")
+    title = ["股票名称", "股票1日换手率OBV", "股票6日换手率MAOBV", "股票12日换手率MAOBV", "股票26日换手率MAOBV"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+#        print(filename)
+        _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+        OBV = 0
+        MAOBV_6 = 0
+        MAOBV_12 = 0
+        MAOBV_26 = 0
+        for ii in reversed(range(len(stockdata_list))):
+            if((float(stockdata_list[ii][4])-float(stockdata_list[ii][5]))==0):
+                OBV = np.sign(float(stockdata_list[ii][9])) * float(stockdata_list[ii][10])
+            else:
+                OBV = ((float(stockdata_list[ii][3])-float(stockdata_list[ii][5])-(float(stockdata_list[ii][4])-float(stockdata_list[ii][3])))/
+                    (float(stockdata_list[ii][4])-float(stockdata_list[ii][5]))*float(stockdata_list[ii][10]))
+            MAOBV_6 = MAOBV_6*5/7 + OBV*2/7
+            MAOBV_12 = MAOBV_12*11/13 + OBV*2/13
+            MAOBV_26 = MAOBV_26*25/27 + OBV*2/27
+        resultdata_list.append([filename, OBV, MAOBV_6, MAOBV_12, MAOBV_26])
+    write_csvfile(resultfile_path, title, resultdata_list)
+
+
+def box_Model_Select():
+    resultfile_path = os.path.join(resultdata_path, "box_Model_Select_Result.csv")
+    title = ["股票名称", "股票最高点价格", "股票最低点价格", "股票当前价格", "股票下跌幅度", "股票反弹幅度", "股票下跌天数"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+        closing_price = float(stockdata_list[0][3])
+        for paratuple in [(100, 0.6), (60, 0.7), (30, 0.8)]:
+            closing_price_list = [float(item[3]) for item in stockdata_list[:(min(len(stockdata_list), paratuple[0]))]]
+            max_price = max(closing_price_list)
+            max_offset = closing_price_list.index(max_price)
+            min_price = min(closing_price_list)
+            min_offset = closing_price_list.index(min_price)
+            if((min_offset==3) and (min_offset<max_offset) and (min_price<paratuple[1]*max_price)):
+                resultdata_list.append([filename, max_price, min_price, stockdata_list[0][3], ((min_price-max_price)/max_price), ((closing_price-min_price)/min_price), (max_offset-min_offset)])
     write_csvfile(resultfile_path, title, resultdata_list)
 
 
@@ -377,6 +423,85 @@ def AHCom_Model_Select():
                 resultdata_list.append([filename, AStock_range, HStock_range, AHCom_range, AHComCounter])
         write_csvfile(resultfile_path, title, resultdata_list)
 
+
+def ABCom_Model_Select():
+    ABdata_path = os.path.join(root_path, "Data", "AB_stock_data")
+    ABdataHistory_path = os.path.join(root_path, "Data", "AB_stock_data_history")
+
+    def get_ABdata():
+        AB_url = "http://quotes.money.163.com/hs/realtimedata/service/ab.php?host=/hs/realtimedata/service/ab.php&page=0&query=AB:_exists_;VOLUME:_exists_&fields=NAME,PRICE,SYMBOL,AB,PERCENT,VOLUME,CODE&sort=AB.A_PERCENT&order=desc&count=500&type=query"
+        ABhistory_title = ["A股名称", "A股代码", "A股查询代码", "A股价格", "A股涨跌幅", "B股代码", "B股查询代码", "B股名称", "B股价格", "B股涨跌幅", "B/A成交量比", "B股溢价率(溢价率=(H股价格*0.8545-A股价格)/A股价格*100%)"]
+        ABdata_title = ["时间"] + ABhistory_title
+        ABdataNew_list = []
+        response = get_htmltext(AB_url)
+        if(response!=""):
+            ABdataNew_list = []
+            for ABitem in json.loads(response)["list"]:
+                if(("ST" in str(ABitem["AB"]["A_NAME"]))):
+                    continue
+                ABdataNew = [str(ABitem["AB"]["A_NAME"]), str(ABitem["AB"]["A_SYMBOL"]).format(6), str(ABitem["AB"]["A_CODE"]).format(7),
+                    str(ABitem["AB"]["A_PRICE"]), str(ABitem["AB"]["A_PERCENT"]*100), str(ABitem["SYMBOL"]).format(6), str(ABitem["CODE"]).format(7),
+                    str(ABitem["NAME"]), str(ABitem["PRICE"]), str(ABitem["PERCENT"]*100), str(ABitem["AB"]["VOL_RATIO"]), str(ABitem["AB"]["YJL"])]
+                ABdataNew_list.append(ABdataNew)
+            IsADataChange = True
+            IsBDataChange = True
+            if(os.path.exists(os.path.join(ABdataHistory_path, "temp.csv"))):
+                _, ABdataOld_list = read_csvfile(os.path.join(ABdataHistory_path, "temp.csv"))
+                IsADataChange = False
+                IsBDataChange = False
+                for ABdataNew in ABdataNew_list:
+                    for ABdataOld in ABdataOld_list:
+                        if(ABdataNew[2]==ABdataOld[2]):
+                            if(float(ABdataNew[4])!=float(ABdataOld[4])):
+                                IsADataChange = True
+                            if(float(ABdataNew[9])!=float(ABdataOld[9])):
+                                IsBDataChange = True
+                if((ABdataOld_list==[]) and (ABdataNew_list!=[])):
+                    IsADataChange = True
+                    IsBDataChange = True
+                if(not IsADataChange):
+                    for ii in range(len(ABdataNew_list)):
+                        ABdataNew_list[ii][4] = 0
+                if(not IsHDataChange):
+                    for ii in range(len(ABdataNew_list)):
+                        ABdataNew_list[ii][9] = 0
+            if(IsADataChange or IsBDataChange):
+                write_csvfile(os.path.join(ABdataHistory_path, "temp.csv"), ABhistory_title, ABdataNew_list)
+                write_csvfile(os.path.join(ABdataHistory_path, end_time+".csv"), ABhistory_title, ABdataNew_list)
+                for ABdataNew in ABdataNew_list:
+                    ABfilename = os.path.join(ABdata_path, (str(ABdataNew[0]) + "_" + str(ABdataNew[2]).format(7) + ".csv"))
+                    if(os.path.exists(ABfilename)):
+                        insert_csvfile(ABfilename, ([end_time]+ABdataNew))
+                    else:
+                        write_csvfile(ABfilename, ABdata_title, ([[end_time]+ABdataNew]))
+                return True
+            else:
+                return False
+
+    if(get_ABdata()):
+        resultfile_path = os.path.join(resultdata_path, "ABCom_Model_Select.csv")
+        title = ["股票名称", "A股涨跌幅", "B股涨跌幅", "A股总滞后幅", "股票滞后天数"]
+        resultdata_list = []
+        for filename in os.listdir(ABdata_path):
+#            print(filename)
+            _, ABdata_list = read_csvfile(os.path.join(ABdata_path, filename))
+            AStock_range = 0
+            BStock_range = 0
+            ABCom_range = 0
+            ABComCounter = 0
+            for ii in range(len(ABdata_list)):
+                if(float(ABdata_list[ii][5])<float(ABdata_list[ii][10])):
+                    ABComCounter += 1
+                    AStock_range += float(ABdata_list[ii][5])
+                    BStock_range += float(ABdata_list[ii][10])
+                    ABCom_range += float(ABdata_list[ii][10]) - float(ABdata_list[ii][5])
+                else:
+                    break
+            if(ABComCounter>0):
+                resultdata_list.append([filename, AStock_range, BStock_range, ABCom_range, ABComCounter])
+        write_csvfile(resultfile_path, title, resultdata_list)
+
+
 #def test_Model_Select():
 #    resultfile_path = os.path.join(resultdata_path, "test_Model_Select_Result.csv")
 #    title = ["股票名称", test_item]
@@ -397,27 +522,45 @@ def clear_data():
 
 
 def analyze_stockdata():
-    print("Drop_Model_Select Begin!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tDrop_Model_Select Begin!")
     drop_Model_Select()
-    print("Drop_Model_Select Finished!")
-    print("Vshape_Model_Select Begin!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tDrop_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tVshape_Model_Select Begin!")
     vshape_Model_Select()
-    print("Vshape_Model_Select Finished!")
-    print("Lagging_Model_Select Begin!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tVshape_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tLagging_Model_Select Begin!")
     lagging_Model_Select()
-    print("Lagging_Model_Select Finished!")
-    print("MACD_Model_Select Begin!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tLagging_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tobv_Model_Select Begin!")
+    obv_Model_Select()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tobv_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMACD_Model_Select Begin!")
     MACD_Model_Select()
-    print("MACD_Model_Select Finished!")
-    print("AHCom_Model_Select Begin!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMACD_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tAHCom_Model_Select Begin!")
     AHCom_Model_Select()
-    print("AHCom_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tAHCom_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tABCom_Model_Select Begin!")
+    ABCom_Model_Select()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tABCom_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tbox_Model_Select Begin!")
+    box_Model_Select()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tbox_Model_Select Finished!")
 
 
 if __name__ == "__main__":
-#    get_stockdata()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tData Prepare Begin!")
     if(get_index_data()):
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tClear Stock Data Begin!")
         clear_data()
-#        get_stockinfo()
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tClear Stock Data Finished!")
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tGenerage Stock Data Begin!")
+        get_stockinfo()
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tGenerage Stock Data Finished!")
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tData Download Begin!")
         get_stockdata()
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tData Download Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tData Prepare Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tData Analyze Begin!")
     analyze_stockdata()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tData Analyze Finished!")
