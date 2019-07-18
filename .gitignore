@@ -1,3 +1,4 @@
 *.csv
 *.log
 Data/stock_info.txt
+*.xls
