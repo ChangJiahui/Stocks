@@ -83,7 +83,7 @@ def morningfall_select():
 def afternoonfall_select():
     resultfile_path = os.path.join(resultdata_path, "afternoonfall_select.csv")
     get_realtimedata(nightdata_path)
-    title = ["股票代码", "股票名称", "上午涨跌幅", "午后涨跌幅", "今日涨跌幅", "开盘涨跌幅", "柱线幅度", "下影线幅度", "上影线幅度"]
+    title = ["股票代码", "股票名称", "今日涨跌幅", "上午涨跌幅", "午后涨跌幅", "开盘涨跌幅", "柱线幅度", "下影线幅度", "上影线幅度"]
     resultdata_list = []
     _, nightdata_list = read_csvfile(nightdata_path)
     _, noondata_list = read_csvfile(noondata_path)
@@ -100,7 +100,7 @@ def afternoonfall_select():
         downshadow_range = (min(float(nightitem[4]), float(nightitem[3]))-float(nightitem[6]))/float(nightitem[7])*100
         upshadow_range = (float(nightitem[5])-max(float(nightitem[4]), float(nightitem[3])))/float(nightitem[7])*100
         if(afternoon_range<-3):
-            resultdata_list.append([nightitem[0], item[1], item[2], item[3], round(open_range,2), round(cylinder_range,2), round(downshadow_range,2), round(upshadow_range,2)])
+            resultdata_list.append([nightitem[0], nightitem[1], nightitem[2], noon_range, afternoon_range, round(open_range,2), round(cylinder_range,2), round(downshadow_range,2), round(upshadow_range,2)])
     write_csvfile(resultfile_path, title, resultdata_list)
 
 
