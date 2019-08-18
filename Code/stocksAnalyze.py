@@ -34,11 +34,13 @@ if __name__=="__main__":
         os.mkdir(resultdata_path)
 
 
-
 def read_csvfile(filename):
-    with open(filename, 'r') as fp:
-        data_list = list(csv.reader(fp))
-        return data_list[0], data_list[1:]
+    if(os.path.exists(filename)):
+        with open(filename, 'r') as fp:
+            data_list = list(csv.reader(fp))
+            return data_list[0], data_list[1:]
+    else:
+        return [], []
 
 
 def write_csvfile(filename, title, data_list):
@@ -174,10 +176,10 @@ def get_stockinfo():
     CSI1000_filepath = os.path.join(root_path, "Data", "CSI1000.xls")
     CSIAll_url = "http://www.csindex.com.cn/uploads/file/autofile/cons/000902cons.xls"
     CSIAll_filepath = os.path.join(root_path, "Data", "CSIAll.xls")
+    CSIAll_list = get_indexcomponent("CSIAll", CSIAll_url, CSIAll_filepath)
+    CSI1000_list = get_indexcomponent("CSI1000", CSI1000_url, CSI1000_filepath)
     HS300_list = get_indexcomponent("HS300", HS300_url, HS300_filepath)
     CSI500_list = get_indexcomponent("CSI500", CSI500_url, CSI500_filepath)
-    CSI1000_list = get_indexcomponent("CSI1000", CSI1000_url, CSI1000_filepath)
-    CSIAll_list = get_indexcomponent("CSIAll", CSIAll_url, CSIAll_filepath)
     with open(stockinfo_file, 'w') as fp:
         for ii in reversed(range(len(CSIAll_list))):
             if("ST" in CSIAll_list[ii]['stockname']):
@@ -254,7 +256,7 @@ def get_stockdata():
 def EHBF_Analyze():
 # 横盘天数 & 振幅 & EMA & MAOBV & PE & PB
     resultfile_path = os.path.join(resultdata_path, "EHBF_Analyze_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "获利持仓比例", "横盘天数", "平均6日振幅", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅", "1日换手率OBV", "6日换手率EMAOBV", "12日换手率EMAOBV", "26日换手率MEAOBV"]
+    title = ["股票名称", "当日涨跌幅", "百日位置(%)", "获利持仓比例", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均6日振幅", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅", "1日换手率OBV", "6日换手率EMAOBV", "12日换手率EMAOBV", "26日换手率MEAOBV"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         resultdata_list.append(EHBF_Analyze_pipeline(filename))
@@ -276,7 +278,7 @@ def EHBF_Analyze():
     write_csvfile(resultfile_path, title, resultdata_list)
 def EHBF_Analyze_par():
     resultfile_path = os.path.join(resultdata_path, "EHBF_Analyze_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "获利持仓比例", "横盘天数", "平均6日振幅", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅", "1日换手率OBV", "6日换手率EMAOBV", "12日换手率EMAOBV", "26日换手率MEAOBV"]
+    title = ["股票名称", "当日涨跌幅", "百日位置(%)", "获利持仓比例", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均6日振幅", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅", "1日换手率OBV", "6日换手率EMAOBV", "12日换手率EMAOBV", "26日换手率MEAOBV"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(EHBF_Analyze_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -347,34 +349,54 @@ def EHBF_Analyze_pipeline(filename):
         earnratio = earnobv/sum(obv_dict.values())
         return earnratio
     
+    def stable_Analyze(stockdata_list):
+        closingprice = float(stockdata_list[0][3])
+        stable5counter = 0
+        stable10counter = 0
+        stable20counter = 0
+        for ii in range(1, len(stockdata_list)):
+            if(-0.05<=((float(stockdata_list[ii][3])-closingprice)/closingprice)<=0.05):
+                stable5counter += 1
+            else:
+                break
+        for ii in range(1, len(stockdata_list)):
+            if(-0.10<=((float(stockdata_list[ii][3])-closingprice)/closingprice)<=0.10):
+                stable10counter += 1
+            else:
+                break
+        for ii in range(1, len(stockdata_list)):
+            if(-0.20<=((float(stockdata_list[ii][3])-closingprice)/closingprice)<=0.20):
+                stable20counter += 1
+            else:
+                break
+        return stable5counter, stable10counter, stable20counter
+
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
+    maxprice = max([float(item[3]) for item in stockdata_list[:100]])
+    minprice = min([float(item[3]) for item in stockdata_list[:100]])
     closingprice = float(stockdata_list[0][3])
-    stablecounter = 0
-    for ii in range(1, len(stockdata_list)):
-        if(-0.05<=((float(stockdata_list[ii][3])-closingprice)/closingprice)<=0.05):
-            stablecounter += 1
-        else:
-            break
+    reboundrange = (closingprice-minprice)/(maxprice-minprice)*100
+    stable5counter, stable10counter, stable20counter = stable_Analyze(stockdata_list)
     EMA6_range, EMA12_range, EMA24_range = EMA_Analyze(stockdata_list)
     OBV, EMAOBV6, EMAOBV12, EMAOBV26 = EMAOBV_Analyze(stockdata_list)
     earnratio = earnratio_Analyze(stockdata_list[:500])
-    drop30_range = sum([float(item[9]) for item in stockdata_list[:min(30, len(stockdata_list))]])
-    amplitude6 = np.mean([((float(item[4])-float(item[5]))/float(item[7])*100) for item in stockdata_list[:min(6, len(stockdata_list))]])
-    return [stockinfo, stockdata_list[0][9], earnratio, stablecounter, amplitude6, EMA6_range, EMA12_range, EMA24_range, drop30_range, OBV, EMAOBV6, EMAOBV12, EMAOBV26]
+    drop30_range = (float(stockdata_list[0][3])-float(stockdata_list[min(30,len(stockdata_list)-1)][3]))/float(stockdata_list[min(30,len(stockdata_list)-1)][3])*100
+    amplitude6 = np.mean([((float(item[4])-float(item[5]))/float(item[7])*100) for item in stockdata_list[:6]])
+    return [stockinfo, stockdata_list[0][9], reboundrange, earnratio, stable5counter, stable10counter, stable20counter, amplitude6, EMA6_range, EMA12_range, EMA24_range, drop30_range, OBV, EMAOBV6, EMAOBV12, EMAOBV26]
 
 
 def drop_Model_Select():
 # 连续多日跌幅模型
     resultfile_path = os.path.join(resultdata_path, "drop_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "连续跌幅天数", "日累计总跌幅", "收盘价连续最低天数", "最低价连续最低天数"]
+    title = ["股票名称", "当日涨跌幅", "连续跌幅天数", "日累计总跌幅", "收盘价连续最低天数", "最低价连续最低天数", "百日最多跌幅天数", "百日最大连续跌幅"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         resultdata_list.append(drop_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
 def drop_Model_Select_par():
     resultfile_path = os.path.join(resultdata_path, "drop_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "连续跌幅天数", "日累计总跌幅", "收盘价连续最低天数", "最低价连续最低天数"]
+    title = ["股票名称", "当日涨跌幅", "连续跌幅天数", "日累计总跌幅", "收盘价连续最低天数", "最低价连续最低天数", "百日最多跌幅天数", "百日最大连续跌幅"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(drop_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -384,29 +406,81 @@ def drop_Model_Select_pipeline(filename):
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     dropcounter = 0
-    droprange = 0
-    for ii in range(len(stockdata_list)):
+    for ii in range(len(stockdata_list)-1):
         if(float(stockdata_list[ii][9])<0):
             dropcounter += 1
-            droprange += float(stockdata_list[ii][9])
-        else:
-            break
-    closingprice = float(stockdata_list[0][3])
-    leastprice = float(stockdata_list[0][5])
-    closingcounter = 0
-    leastcounter = 0
-    for ii in range(1, len(stockdata_list)):
-        if(leastprice<float(stockdata_list[ii][3])):
-            leastcounter += 1
-        else:
-            break
-    for ii in range(1, len(stockdata_list)):
-        if(closingprice<float(stockdata_list[ii][3])):
-            closingcounter += 1
         else:
             break
     if(dropcounter>0):
-        return [stockinfo, stockdata_list[0][9], dropcounter, droprange, closingcounter, leastcounter]
+        droprange = (float(stockdata_list[0][3])-float(stockdata_list[dropcounter][3]))/float(stockdata_list[dropcounter][3])*100
+        closingprice = float(stockdata_list[0][3])
+        leastprice = float(stockdata_list[0][5])
+        closingcounter = 0
+        leastcounter = 0
+        for ii in range(1, len(stockdata_list)):
+            if(leastprice<float(stockdata_list[ii][3])):
+                leastcounter += 1
+            else:
+                break
+        for ii in range(1, len(stockdata_list)):
+            if(closingprice<float(stockdata_list[ii][3])):
+                closingcounter += 1
+            else:
+                break
+        maxdropcounter = 0
+        maxdroprange = 0
+        for ii in range(dropcounter, min(100,len(stockdata_list))):
+            tempdropcounter = 0
+            for jj in range(ii, len(stockdata_list)-1):
+                if(float(stockdata_list[jj][9])<0):
+                    tempdropcounter += 1
+                else:
+                    tempdroprange = (float(stockdata_list[ii][3])-float(stockdata_list[ii+tempdropcounter][3]))/float(stockdata_list[ii+tempdropcounter][3])*100
+                    if(tempdroprange<maxdroprange):
+                        maxdroprange = tempdroprange
+                    if(tempdropcounter>maxdropcounter):
+                        maxdropcounter = tempdropcounter
+                    break
+        return [stockinfo, stockdata_list[0][9], dropcounter, droprange, closingcounter, leastcounter, maxdropcounter, maxdroprange]
+    else:
+        return []
+
+
+def rise_Model_Select():
+# 连续多日上涨(&阳线)模型
+    resultfile_path = os.path.join(resultdata_path, "rise_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "连续上涨天数",  "日累计总涨幅", "放量倍数", "百日位置(%)"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(rise_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def rise_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "rise_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "连续上涨天数", "日累计总涨幅", "放量倍数", "百日位置(%)"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(rise_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def rise_Model_Select_pipeline(filename):
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    risecounter = 0
+    for ii in range(len(stockdata_list)-1):
+#        if((float(stockdata_list[ii][9])>0) or (float(stockdata_list[ii][3])>float(stockdata_list[ii][6]))):
+#        if(float(stockdata_list[ii][3])>float(stockdata_list[ii][6])):
+        if(float(stockdata_list[ii][9])>0):
+            risecounter += 1
+        else:
+            break
+    maxprice = max([float(item[3]) for item in stockdata_list[:100]])
+    minprice = min([float(item[3]) for item in stockdata_list[:100]])
+    closingprice = float(stockdata_list[0][3])
+    reboundrange = (closingprice-minprice)/(maxprice-minprice)*100
+    if((risecounter>=3) and (reboundrange<50)):
+        riserange = (float(stockdata_list[0][3])-float(stockdata_list[risecounter][3]))/float(stockdata_list[risecounter][3])*100
+        volumnratio = float(stockdata_list[0][10])/float(stockdata_list[1][10])
+        return [stockinfo, stockdata_list[0][9], risecounter, riserange, volumnratio, reboundrange]
     else:
         return []
 
@@ -496,7 +570,7 @@ def box_Model_Select_pipeline(filename):
     stockinfo = filename.split(".")[0]
     closingprice = float(stockdata_list[0][3])
     for paratuple in [(400, 0.4), (300, 0.45), (200, 0.5), (100, 0.6), (60, 0.7), (30, 0.8)]:
-        closingprice_list = [float(item[3]) for item in stockdata_list[:(min(len(stockdata_list), paratuple[0]))]]
+        closingprice_list = [float(item[3]) for item in stockdata_list[:min(len(stockdata_list), paratuple[0])]]
         maxprice = max(closingprice_list)
         max_offset = closingprice_list.index(maxprice)
         minprice = min(closingprice_list)
@@ -509,17 +583,112 @@ def box_Model_Select_pipeline(filename):
             return []
 
 
+def wave_Model_Select():
+# 波浪模型
+    resultfile_path = os.path.join(resultdata_path, "wave_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "降浪波数", "升浪波数", "股票下跌天数", "股票反弹天数", "股票下跌幅度", "股票反弹幅度", "最近浪顶下跌", "最近浪底回升", "上一浪顶下跌", "相邻浪顶涨跌"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(wave_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def wave_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "wave_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "降浪波数", "升浪波数", "股票下跌天数", "股票反弹天数", "股票下跌幅度", "股票反弹幅度", "最近浪顶下跌", "最近浪底回升", "上一浪顶下跌", "相邻浪顶涨跌"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(wave_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def wave_Model_Select_pipeline(filename):
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    closingprice = float(stockdata_list[0][3])
+    perioddaynum = min(len(stockdata_list), 500)
+    rounddaynum = 10
+    closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum]]
+    maxprice_list = []
+    minprice_list = []
+    maxoffset_list = []
+    minoffset_list = []
+    lastextremeprice = 0.01
+    startoffset = 0
+    for ii in range(perioddaynum):
+        if(closingprice_list[ii]==min(closingprice_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])):
+            minprice_list.append(closingprice_list[ii])
+            minoffset_list.append(ii)
+            startoffset = ii+1
+            lastextremeprice=closingprice_list[ii]
+            isDrop = True
+            break
+        elif(closingprice_list[ii]==max(closingprice_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])):
+            return []
+#            maxprice_list.append(closingprice_list[ii])
+#            maxoffset_list.append(ii)
+#            lastextremeprice=closingprice_list[ii]
+#            isDrop = False
+#            break
+    for ii in range(perioddaynum):
+        tempmaxprice = max(closingprice_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])
+        tempminprice = min(closingprice_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])
+        if(isDrop):
+            if((closingprice_list[ii]==tempmaxprice) and ((closingprice_list[ii]-lastextremeprice)/closingprice_list[ii]>0.10)):
+                maxprice_list.append(closingprice_list[ii])
+                maxoffset_list.append(ii)
+                lastextremeprice=closingprice_list[ii]
+                isDrop = False
+            elif((closingprice_list[ii]==tempminprice) and (closingprice_list[ii]<minprice_list[-1])):
+                minprice_list[-1]=closingprice_list[ii]
+                minoffset_list[-1]=ii
+                lastextremeprice=closingprice_list[ii]
+        else:
+            if((closingprice_list[ii]==tempminprice) and ((closingprice_list[ii]-lastextremeprice)/closingprice_list[ii]<-0.10)):
+                minprice_list.append(closingprice_list[ii])
+                minoffset_list.append(ii)
+                lastextremeprice=closingprice_list[ii]
+                isDrop = True
+            elif((closingprice_list[ii]==tempmaxprice) and (closingprice_list[ii]>maxprice_list[-1])):
+                maxprice_list[-1]=closingprice_list[ii]
+                maxoffset_list[-1]=ii
+                lastextremeprice=closingprice_list[ii]
+    upwavecounter = 0
+    downwavecounter = 0
+    for ii in range(len(maxprice_list)-2):
+        if(minprice_list[ii]>=minprice_list[ii+1]):
+            upwavecounter+=1
+        else:
+            break
+    for ii in range(upwavecounter+1, len(maxprice_list)-1):
+        if(maxprice_list[ii]<=maxprice_list[ii+1]):
+            downwavecounter+=1
+        else:
+            break
+    if(downwavecounter>0):
+        minprice = minprice_list[upwavecounter]
+        maxprice = maxprice_list[upwavecounter+1+downwavecounter]
+        minoffset = minoffset_list[upwavecounter]
+        maxoffset = maxoffset_list[upwavecounter+1+downwavecounter]
+        maxfailrange = (minprice-maxprice)/maxprice*100
+        maxreboundrange = (closingprice-minprice)/maxprice*100
+        failrange = (minprice_list[0]-maxprice_list[0])/maxprice_list[0]*100
+        reboundrange = (closingprice-minprice_list[0])/minprice_list[0]*100
+        lastfailrange = (minprice_list[1]-maxprice_list[1])/maxprice_list[1]*100
+        waveratio = (maxprice_list[0]-maxprice_list[1])/maxprice_list[1]*100
+        return [stockinfo, stockdata_list[0][9], downwavecounter, upwavecounter, (maxoffset-minoffset), minoffset, maxfailrange, maxreboundrange, failrange, reboundrange, lastfailrange, waveratio]
+    else:
+        return []
+
+
 def volumn_Model_Select():
 # 放量模型
     resultfile_path = os.path.join(resultdata_path, "volumn_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "放量倍数", "5日总涨跌幅", "10日总涨跌幅", "30日总涨跌幅", "当前价格", "百日最高价", "百日最低价"]
+    title = ["股票名称", "当日涨跌幅", "放量倍数", "百日位置(%)", "5日总涨跌幅", "10日总涨跌幅", "30日总涨跌幅", "当前价格"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         resultdata_list.append(volumn_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
 def volumn_Model_Select_par():
     resultfile_path = os.path.join(resultdata_path, "volumn_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "放量倍数", "5日总涨跌幅", "10日总涨跌幅", "30日总涨跌幅", "当前价格", "百日最高价", "百日最低价"]
+    title = ["股票名称", "当日涨跌幅", "放量倍数", "百日位置(%)", "5日总涨跌幅", "10日总涨跌幅", "30日总涨跌幅", "当前价格"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(volumn_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -530,12 +699,14 @@ def volumn_Model_Select_pipeline(filename):
     stockinfo = filename.split(".")[0]
     volumn_ratio = float(stockdata_list[0][10])/float(stockdata_list[1][10])
     if(volumn_ratio>2):
-        drop5_range = sum([float(item[9]) for item in stockdata_list[:min(5, len(stockdata_list))]])
-        drop10_range = sum([float(item[9]) for item in stockdata_list[:min(10, len(stockdata_list))]])
-        drop30_range = sum([float(item[9]) for item in stockdata_list[:min(30, len(stockdata_list))]])
-        max100_price = max([float(item[3]) for item in stockdata_list[:min(100, len(stockdata_list))]])
-        min100_price = min([float(item[3]) for item in stockdata_list[:min(100, len(stockdata_list))]])
-        return [stockinfo, stockdata_list[0][9], volumn_ratio, drop5_range, drop10_range, drop30_range, stockdata_list[0][3], max100_price, min100_price]
+        maxprice = max([float(item[3]) for item in stockdata_list[:min(100, len(stockdata_list))]])
+        minprice = min([float(item[3]) for item in stockdata_list[:min(100, len(stockdata_list))]])
+        closingprice = float(stockdata_list[0][3])
+        reboundrange = (closingprice-minprice)/(maxprice-minprice)*100
+        drop5_range = (float(stockdata_list[0][3])-float(stockdata_list[min(len(stockdata_list)-1, 5)][3]))/float(stockdata_list[min(len(stockdata_list)-1, 5)][3])*100
+        drop10_range = (float(stockdata_list[0][3])-float(stockdata_list[min(len(stockdata_list)-1, 10)][3]))/float(stockdata_list[min(len(stockdata_list)-1, 10)][3])*100
+        drop30_range = (float(stockdata_list[0][3])-float(stockdata_list[min(len(stockdata_list)-1, 30)][3]))/float(stockdata_list[min(len(stockdata_list)-1, 30)][3])*100
+        return [stockinfo, stockdata_list[0][9], volumn_ratio, reboundrange, drop5_range, drop10_range, drop30_range]
     else:
         return []
 
@@ -590,7 +761,7 @@ def trend5_Model_Select():
     title = ["股票名称", "当日涨跌幅", "5日线上穿10日线预测天数", "10日线下方天数", "股票上穿前总跌幅", "当前价格", "日线交叉价格", "日线平行价格"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
-        resultdata_list.append(trend_Model_Select_pipeline(filename))
+        resultdata_list.append(trend5_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
 def trend5_Model_Select_par():
     resultfile_path = os.path.join(resultdata_path, "trend5_Model_Select_Result.csv")
@@ -634,7 +805,7 @@ def trend10_Model_Select():
     title = ["股票名称", "当日涨跌幅", "10日线上穿30日线预测天数", "30日线下方天数", "股票上穿前总跌幅", "当前价格", "日线交叉价格", "日线平行价格"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
-        resultdata_list.append(trend_Model_Select_pipeline(filename))
+        resultdata_list.append(trend10_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
 def trend10_Model_Select_par():
     resultfile_path = os.path.join(resultdata_path, "trend10_Model_Select_Result.csv")
@@ -958,20 +1129,28 @@ def lagging_Model_Select():
     index_list = ["上证指数_0000001", "深证成指_1399001"]
     indexfile_list = [os.path.join(indexdata_path, (item+".csv")) for item in index_list]
     resultfile_path = os.path.join(resultdata_path, "lagging_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "股票总涨跌幅", "指数总涨跌幅", "股票总滞后幅", "股票滞后天数", "30日总滞后幅", "30日滞后天数", "60日总滞后幅", "100日总滞后幅"]
+    title = ["股票名称", "当日涨跌幅", "股票总涨跌幅", "指数总涨跌幅", "股票总滞后幅", "股票滞后天数", "30日总滞后幅", "30日滞后天数", "60日总滞后幅", "60日滞后天数", "100日总滞后幅", "100日滞后天数", "200日总滞后幅", "200日滞后天数"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         resultdata_list.append(lagging_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
 def lagging_Model_Select_par():
     resultfile_path = os.path.join(resultdata_path, "lagging_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "股票总涨跌幅", "指数总涨跌幅", "股票总滞后幅", "股票滞后天数", "30日总滞后幅", "30日滞后天数", "60日总滞后幅", "60日滞后天数", "100日总滞后幅", "100日滞后天数"]
+    title = ["股票名称", "当日涨跌幅", "股票总涨跌幅", "指数总涨跌幅", "股票总滞后幅", "股票滞后天数", "30日总滞后幅", "30日滞后天数", "60日总滞后幅", "60日滞后天数", "100日总滞后幅", "100日滞后天数", "200日总滞后幅", "200日滞后天数"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(lagging_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
     pool.join()
     write_csvfile(resultfile_path, title, resultdata_list)
 def lagging_Model_Select_pipeline(filename):
+    def lagging_calc(indexdata_list, stockdata_list, perioddaynum):
+        perioddaynum = min(perioddaynum, len(stockdata_list)-1, len(indexdata_list)-1)
+        lagging_counter = 0
+        for ii in range(perioddaynum):
+            if(float(indexdata_list[ii][9])>float(stockdata_list[ii][9])):
+                lagging_counter += 1
+        lagging_range = (float(indexdata_list[0][3])-float(indexdata_list[perioddaynum][3]))/float(indexdata_list[perioddaynum][3])*100 - (float(stockdata_list[0][3])-float(stockdata_list[perioddaynum][3]))/float(stockdata_list[perioddaynum][3])*100
+        return lagging_counter, lagging_range
     index_list = ["上证指数_0000001", "深证成指_1399001"]
     indexfile_list = [os.path.join(indexdata_path, (item+".csv")) for item in index_list]
     stockinfo = filename.split(".")[0]
@@ -981,37 +1160,20 @@ def lagging_Model_Select_pipeline(filename):
         indexfile = indexfile_list[1]
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     _, indexdata_list = read_csvfile(indexfile)
-    stock_range = 0
-    index_range = 0
-    lagging_range = 0
     lagging_counter = 0
     for ii in range(len(stockdata_list)):
         if(float(stockdata_list[ii][9])<float(indexdata_list[ii][9])):
             lagging_counter += 1
-            stock_range += float(stockdata_list[ii][9])
-            index_range += float(indexdata_list[ii][9])
-            lagging_range += float(indexdata_list[ii][9]) - float(stockdata_list[ii][9])
         else:
             break
-    lagging30_range = 0
-    lagging30_counter = 0
-    for ii in range(min(30, len(stockdata_list))):
-        if(float(indexdata_list[ii][9])>float(stockdata_list[ii][9])):
-             lagging30_counter += 1
-        lagging30_range += float(indexdata_list[ii][9]) - float(stockdata_list[ii][9])
-    lagging60_range = 0
-    lagging60_counter = 0
-    for ii in range(min(60, len(stockdata_list))):
-        if(float(indexdata_list[ii][9])>float(stockdata_list[ii][9])):
-             lagging60_counter += 1
-        lagging60_range += float(indexdata_list[ii][9]) - float(stockdata_list[ii][9])
-    lagging100_range = 0
-    lagging100_counter = 0
-    for ii in range(min(100, len(stockdata_list))):
-        if(float(indexdata_list[ii][9])>float(stockdata_list[ii][9])):
-             lagging100_counter += 1
-        lagging100_range += float(indexdata_list[ii][9]) - float(stockdata_list[ii][9])
-    return [stockinfo, stockdata_list[0][9], stock_range, index_range, lagging_range, lagging_counter, lagging30_range, lagging30_counter, lagging60_range, lagging60_counter, lagging100_range, lagging100_counter]
+    stock_range = (float(stockdata_list[0][3])-float(stockdata_list[lagging_counter][3]))/float(stockdata_list[lagging_counter][3])*100
+    index_range = (float(stockdata_list[0][3])-float(indexdata_list[lagging_counter][3]))/float(indexdata_list[lagging_counter][3])*100
+    lagging_range = index_range - stock_range
+    lagging30_counter, lagging30_range = lagging_calc(indexdata_list, stockdata_list, 30)
+    lagging60_counter, lagging60_range = lagging_calc(indexdata_list, stockdata_list, 60)
+    lagging100_counter, lagging100_range = lagging_calc(indexdata_list, stockdata_list, 100)
+    lagging200_counter, lagging200_range = lagging_calc(indexdata_list, stockdata_list, 200)
+    return [stockinfo, stockdata_list[0][9], stock_range, index_range, lagging_range, lagging_counter, lagging30_range, lagging30_counter, lagging60_range, lagging60_counter, lagging100_range, lagging100_counter, lagging200_range, lagging200_counter]
     
 
 def AHCom_Model_Select():
@@ -1075,21 +1237,18 @@ def AHCom_Model_Select():
             _, AHdata_list = read_csvfile(os.path.join(AHdata_path, filename))
             stockinfo = filename.split(".")[0]
             stockHinfo = (str(AHdata_list[-1][7])+"_"+str(AHdata_list[-1][6]).format(5))
-            AStock_range = 0
-            HStock_range = 0
-            AHCom_range = 0
             AHComCounter = 0
             for ii in reversed(range(len(AHdata_list))):
                 if(float(AHdata_list[ii][5])<float(AHdata_list[ii][9])):
                     AHComCounter += 1
-                    AStock_range += float(AHdata_list[ii][5])
-                    HStock_range += float(AHdata_list[ii][9])
-                    AHCom_range += float(AHdata_list[ii][9]) - float(AHdata_list[ii][5])
                 else:
                     break
-            AHCom30_range = 0
-            for ii in reversed(range(min(30, len(AHdata_list)))):
-                AHCom30_range += float(AHdata_list[ii][9]) - float(AHdata_list[ii][5])
+            if(AHComCounter==len(AHdata_list)):
+                AHComCounter -= 1
+            AStock_range = (float(AHdata_list[0][4])-float(AHdata_list[AHComCounter][4]))/float(AHdata_list[AHComCounter][4])*100
+            HStock_range = (float(AHdata_list[0][8])-float(AHdata_list[AHComCounter][8]))/float(AHdata_list[AHComCounter][8])*100
+            AHCom_range = HStock_range - AStock_range
+            AHCom30_range = (float(AHdata_list[0][8])-float(AHdata_list[min(30,len(AHdata_list)-1)][8]))/float(AHdata_list[min(30,len(AHdata_list)-1)][8])*100 - (float(AHdata_list[0][4])-float(AHdata_list[min(30,len(AHdata_list)-1)][4]))/float(AHdata_list[min(30,len(AHdata_list)-1)][4])*100
             resultdata_list.append([stockinfo, stockHinfo, AHComCounter, AHdata_list[-1][5], AStock_range, HStock_range, AHCom_range, AHCom30_range])
         write_csvfile(resultfile_path, title, resultdata_list)
 
@@ -1155,21 +1314,18 @@ def ABCom_Model_Select():
             _, ABdata_list = read_csvfile(os.path.join(ABdata_path, filename))
             stockinfo = filename.split(".")[0]
             stockBinfo = (str(ABdata_list[-1][8])+"_"+str(ABdata_list[-1][7]).format(6))
-            AStock_range = 0
-            BStock_range = 0
-            ABCom_range = 0
             ABComCounter = 0
             for ii in reversed(range(len(ABdata_list))):
                 if(float(ABdata_list[ii][5])<float(ABdata_list[ii][10])):
                     ABComCounter += 1
-                    AStock_range += float(ABdata_list[ii][5])
-                    BStock_range += float(ABdata_list[ii][10])
-                    ABCom_range += float(ABdata_list[ii][10]) - float(ABdata_list[ii][5])
                 else:
                     break
-            ABCom30_range = 0
-            for ii in reversed(range(min(30, len(ABdata_list)))):
-                ABCom30_range += float(ABdata_list[ii][10]) - float(ABdata_list[ii][5])
+            if(ABComCounter==len(ABdata_list)):
+                ABComCounter -= 1
+            AStock_range = (float(ABdata_list[0][4])-float(ABdata_list[ABComCounter][4]))/float(ABdata_list[ABComCounter][4])*100
+            BStock_range = (float(ABdata_list[0][9])-float(ABdata_list[ABComCounter][9]))/float(ABdata_list[ABComCounter][9])*100
+            ABCom_range = BStock_range - AStock_range
+            ABCom30_range = (float(ABdata_list[0][9])-float(ABdata_list[min(30,len(ABdata_list)-1)][9]))/float(ABdata_list[min(30,len(ABdata_list)-1)][9])*100 - (float(ABdata_list[0][4])-float(ABdata_list[min(30,len(ABdata_list)-1)][4]))/float(ABdata_list[min(30,len(ABdata_list)-1)][4])*100
             resultdata_list.append([stockinfo, stockBinfo, ABComCounter, ABdata_list[-1][5], AStock_range, BStock_range, ABCom_range, ABCom30_range])
         write_csvfile(resultfile_path, title, resultdata_list)
 
@@ -1282,6 +1438,8 @@ def dropMonth_Model_Select_pipeline(filename):
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     monthclosingprice_list, monthmaxprice_list, monthminprice_list = get_MonthData(stockdata_list)
+    if(len(monthclosingprice_list)<5):
+        return []
     month_range = (monthclosingprice_list[0]-monthclosingprice_list[1])/monthclosingprice_list[1]*100
     monthdropcounter = 0
     for ii in range(1, len(monthclosingprice_list)-1):
@@ -1555,6 +1713,9 @@ def trendMonth5_Model_Select_pipeline(filename):
 #def test_Model_Select_pipeline(filename):
 #    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
 #    stockinfo = filename.split(".")[0]
+#    if(filename=="*****-****_*******.csv"):
+#        print(stockinfo)
+#        print(stockdata_list)
 #    if(test_num>0):
 #        return [stockinfo, test_item]
 #    else:
@@ -1577,10 +1738,18 @@ def analyze_stockdata():
 #    drop_Model_Select()
     drop_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tdrop_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\trise_Model_Select Begin!")
+#    drop_Model_Select()
+    rise_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\trise_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tbox_Model_Select Begin!")
 #    box_Model_Select()
     box_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tbox_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\twave_Model_Select Begin!")
+#    wave_Model_Select()
+    wave_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\twave_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tVolumn_Model_Select Begin!")
 #    volumn_Model_Select()
     volumn_Model_Select_par()
@@ -1712,8 +1881,6 @@ def main():
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tsummary_result Begin!")
     summary_result()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tsummary_result Finished!")
-
-
 
 
 if __name__=="__main__":
