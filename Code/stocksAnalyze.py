@@ -1867,7 +1867,16 @@ def summary_result():
     write_csvfile(resultfile_path, title, resultdata_list)
 
 
+def tunet_connect():
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tNet Connect Begin!")
+    with open("D:\\Workspace\\Python\\Stocks\\Code\\tunet.config") as fp:
+        lines = fp.readlines()
+        print(tunet.auth4.login(lines[0], lines[1], net=True))
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tNet Connect Finished!")
+
+
 def main():
+	tunet_connect()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tData Prepare Begin!")
     if(get_163indexdata()):
         print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tClear Stock Data Begin!")
@@ -1889,6 +1898,4 @@ def main():
 
 
 if __name__=="__main__":
-#    main()
-    AHCom_Model_Select()
-    ABCom_Model_Select()
+    main()
