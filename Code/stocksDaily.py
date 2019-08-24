@@ -80,7 +80,7 @@ def morningfall_select():
     resultfile_path = os.path.join(resultdata_path, "morningfall_select.csv")
     EHBFfile_path = os.path.join(analyzedata_path, "EHBF_Analyze_Result.csv")
     get_realtimedata(noondata_path)
-    title = ["股票名称", "当前涨跌幅", "百日位置(%)", "开盘涨跌幅", "柱线幅度", "下影线幅度", "上影线幅度"]
+    title = ["股票名称", "当前涨跌幅", "获利持仓比例", "百日位置(%)", "开盘涨跌幅", "柱线幅度", "下影线幅度", "上影线幅度"]
     resultdata_list = []
     _, noondata_list = read_csvfile(noondata_path)
     _, EHBFdata_list = read_csvfile(EHBFfile_path)
@@ -90,11 +90,13 @@ def morningfall_select():
         downshadow_range = (min(float(item[4]), float(item[3]))-float(item[6]))/float(item[7])*100
         upshadow_range = (float(item[5])-max(float(item[4]), float(item[3])))/float(item[7])*100
         if(cylinder_range<-3):
+            earnratio = "-1"
             reboundrange = "-1"
             for EHBFitem in EHBFdata_list:
                 if(EHBFitem[0].split('_')[-1][-6:]==item[0]):
                     reboundrange = EHBFitem[2]
-            resultdata_list.append([item[1]+"_"+item[0], item[2], reboundrange, round(open_range,2), round(cylinder_range,2), round(downshadow_range,2), round(upshadow_range,2)])
+                    earnratio = EHBFitem[3]
+            resultdata_list.append([item[1]+"_"+item[0], item[2], earnratio, reboundrange, round(open_range,2), round(cylinder_range,2), round(downshadow_range,2), round(upshadow_range,2)])
     write_csvfile(resultfile_path, title, resultdata_list)
 
 
@@ -102,7 +104,7 @@ def afternoonfall_select():
     resultfile_path = os.path.join(resultdata_path, "afternoonfall_select.csv")
     EHBFfile_path = os.path.join(analyzedata_path, "EHBF_Analyze_Result.csv")
     get_realtimedata(nightdata_path)
-    title = ["股票名称", "今日涨跌幅", "百日位置(%)", "上午涨跌幅", "午后涨跌幅", "开盘涨跌幅", "柱线幅度", "下影线幅度", "上影线幅度"]
+    title = ["股票名称", "今日涨跌幅", "获利持仓比例", "百日位置(%)", "上午涨跌幅", "午后涨跌幅", "开盘涨跌幅", "柱线幅度", "下影线幅度", "上影线幅度"]
     resultdata_list = []
     _, nightdata_list = read_csvfile(nightdata_path)
     _, noondata_list = read_csvfile(noondata_path)
@@ -120,11 +122,13 @@ def afternoonfall_select():
         downshadow_range = (min(float(nightitem[4]), float(nightitem[3]))-float(nightitem[6]))/float(nightitem[7])*100
         upshadow_range = (float(nightitem[5])-max(float(nightitem[4]), float(nightitem[3])))/float(nightitem[7])*100
         if(afternoon_range<-3):
+            earnratio = "-1"
             reboundrange = "-1"
             for EHBFitem in EHBFdata_list:
                 if(EHBFitem[0].split('_')[-1][-6:]==nightitem[0]):
                     reboundrange = EHBFitem[2]
-            resultdata_list.append([nightitem[1]+"_"+nightitem[0], nightitem[2], reboundrange, noon_range, afternoon_range, round(open_range,2), round(cylinder_range,2), round(downshadow_range,2), round(upshadow_range,2)])
+                    earnratio = EHBFitem[3]
+            resultdata_list.append([nightitem[1]+"_"+nightitem[0], nightitem[2], earnratio, reboundrange, noon_range, afternoon_range, round(open_range,2), round(cylinder_range,2), round(downshadow_range,2), round(upshadow_range,2)])
     write_csvfile(resultfile_path, title, resultdata_list)
 
 

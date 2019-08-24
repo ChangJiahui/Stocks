@@ -15,6 +15,7 @@ import numpy as np
 import execjs
 import xlrd
 import multiprocessing
+import tunet
 
 
 tspro = ts.pro_api("119921ff45f95fd77e5d149cd1e64e78572712b3d0a5ce38157f255b")
@@ -93,6 +94,9 @@ def get_htmltext(url):
     except Exception as e:
         print(e)
         html_text = ""
+    if(html_text.startswith(u'\ufeff')):
+        html_text = ""
+        return html_text
     return html_text
 
 
@@ -1815,6 +1819,7 @@ def analyze_stockdata():
 #    EHBF_Analyze()
     EHBF_Analyze_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tEHBF_Analyze Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tAHCom_Model_Select Begin!")
     AHCom_Model_Select()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tAHCom_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tABCom_Model_Select Begin!")
@@ -1884,4 +1889,6 @@ def main():
 
 
 if __name__=="__main__":
-    main()
+#    main()
+    AHCom_Model_Select()
+    ABCom_Model_Select()

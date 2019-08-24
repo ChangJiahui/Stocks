@@ -1,4 +1,6 @@
 *.csv
 *.log
-Data/stock_info.txt
 *.xls
+*.config
+*.pyc
+*.txt
