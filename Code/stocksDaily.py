@@ -59,6 +59,7 @@ def get_realtimedata(filename):
     for ii in range(5):
         try:
             df = ts.get_today_all()
+            print()
             break
         except Exception as e:
             print(e)
@@ -97,7 +98,8 @@ def morningfall_select():
                     reboundrange = EHBFitem[2]
                     earnratio = EHBFitem[3]
             resultdata_list.append([item[1]+"_"+item[0], item[2], earnratio, reboundrange, round(open_range,2), round(cylinder_range,2), round(downshadow_range,2), round(upshadow_range,2)])
-    write_csvfile(resultfile_path, title, resultdata_list)
+    if(resultdata_list):
+        write_csvfile(resultfile_path, title, resultdata_list)
 
 
 def afternoonfall_select():
@@ -114,8 +116,8 @@ def afternoonfall_select():
         noon_range = 0
         for noonitem in noondata_list:
             if(noonitem[0]==nightitem[0]):
-                noon_range = float(noonitem[3])
-                afternoon_range = float(nightitem[3])-float(noonitem[3])
+                noon_range = float(noonitem[2])
+                afternoon_range = float(nightitem[2])-float(noonitem[2])
                 break
         open_range = (float(nightitem[4])-float(nightitem[7]))/float(nightitem[7])*100
         cylinder_range = (float(nightitem[3])-float(nightitem[4]))/float(nightitem[7])*100
@@ -129,8 +131,32 @@ def afternoonfall_select():
                     reboundrange = EHBFitem[2]
                     earnratio = EHBFitem[3]
             resultdata_list.append([nightitem[1]+"_"+nightitem[0], nightitem[2], earnratio, reboundrange, noon_range, afternoon_range, round(open_range,2), round(cylinder_range,2), round(downshadow_range,2), round(upshadow_range,2)])
-    write_csvfile(resultfile_path, title, resultdata_list)
+    if(resultdata_list):
+        write_csvfile(resultfile_path, title, resultdata_list)
 
+
+def alldayfall_select():
+    resultfile_path = os.path.join(resultdata_path, "alldayfall_select.csv")
+    EHBFfile_path = os.path.join(analyzedata_path, "EHBF_Analyze_Result.csv")
+    title = ["股票名称", "今日涨跌幅", "获利持仓比例", "百日位置(%)", "开盘涨跌幅", "柱线幅度", "下影线幅度", "上影线幅度"]
+    resultdata_list = []
+    _, nightdata_list = read_csvfile(nightdata_path)
+    _, EHBFdata_list = read_csvfile(EHBFfile_path)
+    for nightitem in nightdata_list:
+        open_range = (float(nightitem[4])-float(nightitem[7]))/float(nightitem[7])*100
+        cylinder_range = (float(nightitem[3])-float(nightitem[4]))/float(nightitem[7])*100
+        downshadow_range = (min(float(nightitem[4]), float(nightitem[3]))-float(nightitem[6]))/float(nightitem[7])*100
+        upshadow_range = (float(nightitem[5])-max(float(nightitem[4]), float(nightitem[3])))/float(nightitem[7])*100
+        if(cylinder_range<-4):
+            earnratio = "-1"
+            reboundrange = "-1"
+            for EHBFitem in EHBFdata_list:
+                if(EHBFitem[0].split('_')[-1][-6:]==nightitem[0]):
+                    reboundrange = EHBFitem[2]
+                    earnratio = EHBFitem[3]
+            resultdata_list.append([nightitem[1]+"_"+nightitem[0], nightitem[2], earnratio, reboundrange, round(open_range,2), round(cylinder_range,2), round(downshadow_range,2), round(upshadow_range,2)])
+    if(resultdata_list):
+        write_csvfile(resultfile_path, title, resultdata_list)
 
 if(__name__ == "__main__"):
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMorningfall_Select Begin!")
@@ -140,3 +166,6 @@ if(__name__ == "__main__"):
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tafternoonfall_Select Begin!")
     afternoonfall_select()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tafternoonfall_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\talldayfall_Select Begin!")
+    alldayfall_select()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\talldayfall_Select Finished!")

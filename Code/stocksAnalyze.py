@@ -604,14 +604,14 @@ def box_Model_Select_pipeline(filename):
 def wave_Model_Select():
 # 波浪模型
     resultfile_path = os.path.join(resultdata_path, "wave_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "降浪波数", "升浪波数", "股票下跌天数", "股票反弹天数", "股票下跌幅度", "股票反弹幅度", "最近浪顶下跌", "最近浪底回升", "上一浪顶下跌", "相邻浪顶涨跌"]
+    title = ["股票名称", "当日涨跌幅", "降浪波数", "升浪波数", "股票下跌天数", "股票反弹天数", "股票下跌幅度", "股票反弹幅度", "最近浪顶下跌", "最近浪底回升", "上一浪顶下跌", "上一浪底回升", "相邻浪顶涨跌", "相邻浪底涨跌"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         resultdata_list.append(wave_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
 def wave_Model_Select_par():
     resultfile_path = os.path.join(resultdata_path, "wave_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "降浪波数", "升浪波数", "股票下跌天数", "股票反弹天数", "股票下跌幅度", "股票反弹幅度", "最近浪顶下跌", "最近浪底回升", "上一浪顶下跌", "相邻浪顶涨跌"]
+    title = ["股票名称", "当日涨跌幅", "降浪波数", "升浪波数", "股票下跌天数", "股票反弹天数", "股票下跌幅度", "股票反弹幅度", "最近浪顶下跌", "最近浪底回升", "上一浪顶下跌", "上一浪底回升", "相邻浪顶涨跌", "相邻浪底涨跌"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(wave_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -688,10 +688,12 @@ def wave_Model_Select_pipeline(filename):
         maxfailrange = (minprice-maxprice)/maxprice*100
         maxreboundrange = (closingprice-minprice)/maxprice*100
         failrange = (minprice_list[0]-maxprice_list[0])/maxprice_list[0]*100
-        reboundrange = (closingprice-minprice_list[0])/minprice_list[0]*100
         lastfailrange = (minprice_list[1]-maxprice_list[1])/maxprice_list[1]*100
-        waveratio = (maxprice_list[0]-maxprice_list[1])/maxprice_list[1]*100
-        return [stockinfo, stockdata_list[0][9], downwavecounter, upwavecounter, (maxoffset-minoffset), minoffset, maxfailrange, maxreboundrange, failrange, reboundrange, lastfailrange, waveratio]
+        reboundrange = (closingprice-minprice_list[0])/minprice_list[0]*100
+        lastreboundrange = (maxprice_list[0]-minprice_list[1])/minprice_list[1]*100
+        wavepeakratio = (maxprice_list[0]-maxprice_list[1])/maxprice_list[1]*100
+        wavevallratio = (minprice_list[0]-minprice_list[1])/minprice_list[1]*100
+        return [stockinfo, stockdata_list[0][9], downwavecounter, upwavecounter, (maxoffset-minoffset), minoffset, maxfailrange, maxreboundrange, failrange, reboundrange, lastfailrange, lastreboundrange, wavepeakratio, wavevallratio]
     else:
         return []
 
@@ -1185,7 +1187,7 @@ def lagging_Model_Select_pipeline(filename):
         else:
             break
     stock_range = (float(stockdata_list[0][3])-float(stockdata_list[lagging_counter][3]))/float(stockdata_list[lagging_counter][3])*100
-    index_range = (float(stockdata_list[0][3])-float(indexdata_list[lagging_counter][3]))/float(indexdata_list[lagging_counter][3])*100
+    index_range = (float(indexdata_list[0][3])-float(indexdata_list[lagging_counter][3]))/float(indexdata_list[lagging_counter][3])*100
     lagging_range = index_range - stock_range
     lagging30_counter, lagging30_range = lagging_calc(indexdata_list, stockdata_list, 30)
     lagging60_counter, lagging60_range = lagging_calc(indexdata_list, stockdata_list, 60)
@@ -1752,6 +1754,10 @@ def clear_data():
 
 
 def analyze_stockdata():
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tEHBF_Analyze Begin!")
+#    EHBF_Analyze()
+    EHBF_Analyze_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tEHBF_Analyze Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tdrop_Model_Select Begin!")
 #    drop_Model_Select()
     drop_Model_Select_par()
@@ -1829,10 +1835,6 @@ def analyze_stockdata():
 #    trendMonth5_Model_Select()
     trendMonth5_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttrendMonth5_Model_Select Finished!")
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tEHBF_Analyze Begin!")
-#    EHBF_Analyze()
-    EHBF_Analyze_par()
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tEHBF_Analyze Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tAHCom_Model_Select Begin!")
     AHCom_Model_Select()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tAHCom_Model_Select Finished!")
