@@ -179,12 +179,17 @@ def check_stockdata(filename):
 
 def get_stockinfo():
 # 得到股票信息字典列表 stock_dict{stocktype,stockname,stockcode, stock163code}
-    def get_indexcomponent(stocktype, url, indexcomponent_file):
-        download_file(url, indexcomponent_file)
-        _, CSIdata_list = read_xlsfile(indexcomponent_file)
-        stockdict_list = []
-        for CSIitem in CSIdata_list:
-            stockdict_list.append({'stocktype':stocktype, 'stockname': CSIitem[5], 'stockcode': CSIitem[4]})
+    def get_indexcomponent(stocktype, url, indexcomponent_file, compnum):
+        for ii in range(5):
+            download_file(url, indexcomponent_file)
+            _, CSIdata_list = read_xlsfile(indexcomponent_file)
+            stockdict_list = []
+            for CSIitem in CSIdata_list:
+                stockdict_list.append({'stocktype':stocktype, 'stockname': CSIitem[5], 'stockcode': CSIitem[4]})
+            if(len(stockdict_list)<=compnum):
+                time.sleep(600)
+            else:
+                break
         return stockdict_list
     HS300_url = "http://www.csindex.com.cn/uploads/file/autofile/cons/000300cons.xls"
     HS300_filepath = os.path.join(root_path, "Data", "HS300.xls")
@@ -194,10 +199,10 @@ def get_stockinfo():
     CSI1000_filepath = os.path.join(root_path, "Data", "CSI1000.xls")
     CSIAll_url = "http://www.csindex.com.cn/uploads/file/autofile/cons/000902cons.xls"
     CSIAll_filepath = os.path.join(root_path, "Data", "CSIAll.xls")
-    CSIAll_list = get_indexcomponent("CSIAll", CSIAll_url, CSIAll_filepath)
-    CSI1000_list = get_indexcomponent("CSI1000", CSI1000_url, CSI1000_filepath)
-    HS300_list = get_indexcomponent("HS300", HS300_url, HS300_filepath)
-    CSI500_list = get_indexcomponent("CSI500", CSI500_url, CSI500_filepath)
+    CSIAll_list = get_indexcomponent("CSIAll", CSIAll_url, CSIAll_filepath, 3000)
+    CSI1000_list = get_indexcomponent("CSI1000", CSI1000_url, CSI1000_filepath, 950)
+    HS300_list = get_indexcomponent("HS300", HS300_url, HS300_filepath, 280)
+    CSI500_list = get_indexcomponent("CSI500", CSI500_url, CSI500_filepath, 460)
     with open(stockinfo_file, 'w') as fp:
         for ii in reversed(range(len(CSIAll_list))):
             if("ST" in CSIAll_list[ii]['stockname']):
@@ -274,7 +279,7 @@ def get_stockdata():
 def EHBF_Analyze():
 # 横盘天数 & 振幅 & EMA & MAOBV & PE & PB
     resultfile_path = os.path.join(resultdata_path, "EHBF_Analyze_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "百日位置(%)", "获利持仓比例", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均6日振幅", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅", "1日换手率OBV", "6日换手率EMAOBV", "12日换手率EMAOBV", "26日换手率MEAOBV"]
+    title = ["股票名称", "当日涨跌幅", "百日位置(%)", "获利持仓比例", "总交易日", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均6日振幅", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅", "1日换手率OBV", "6日换手率EMAOBV", "12日换手率EMAOBV", "26日换手率MEAOBV"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         resultdata_list.append(EHBF_Analyze_pipeline(filename))
@@ -296,7 +301,7 @@ def EHBF_Analyze():
     write_csvfile(resultfile_path, title, resultdata_list)
 def EHBF_Analyze_par():
     resultfile_path = os.path.join(resultdata_path, "EHBF_Analyze_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "百日位置(%)", "获利持仓比例", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均6日振幅", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅", "1日换手率OBV", "6日换手率EMAOBV", "12日换手率EMAOBV", "26日换手率MEAOBV"]
+    title = ["股票名称", "当日涨跌幅", "百日位置(%)", "获利持仓比例", "总交易日", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均6日振幅", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅", "1日换手率OBV", "6日换手率EMAOBV", "12日换手率EMAOBV", "26日换手率MEAOBV"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(EHBF_Analyze_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -401,7 +406,7 @@ def EHBF_Analyze_pipeline(filename):
     earnratio = earnratio_Analyze(stockdata_list[:500])
     drop30_range = (float(stockdata_list[0][3])-float(stockdata_list[min(30,len(stockdata_list)-1)][3]))/float(stockdata_list[min(30,len(stockdata_list)-1)][3])*100
     amplitude6 = np.mean([((float(item[4])-float(item[5]))/float(item[7])*100) for item in stockdata_list[:6]])
-    return [stockinfo, stockdata_list[0][9], reboundrange, earnratio, stable5counter, stable10counter, stable20counter, amplitude6, EMA6_range, EMA12_range, EMA24_range, drop30_range, OBV, EMAOBV6, EMAOBV12, EMAOBV26]
+    return [stockinfo, stockdata_list[0][9], reboundrange, earnratio, len(stockdata_list), stable5counter, stable10counter, stable20counter, amplitude6, EMA6_range, EMA12_range, EMA24_range, drop30_range, OBV, EMAOBV6, EMAOBV12, EMAOBV26]
 
 
 def drop_Model_Select():
@@ -937,8 +942,8 @@ def MACDDIFF_Model_Select():
     write_csvfile(resultfile_path2, title2, resultdata_list2)
 def MACDDIFF_Model_Select_par():
     resultfile_path1 = os.path.join(resultdata_path, "MACD_Model_Select_Result.csv")
-    title1 = ["股票名称", "当日涨跌幅", "估算MACD贯穿天数", "MACD下方天数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格", "MACD不变预测价格"]
     resultfile_path2 = os.path.join(resultdata_path, "DIFF_Model_Select_Result.csv")
+    title1 = ["股票名称", "当日涨跌幅", "估算MACD贯穿天数", "MACD下方天数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格", "MACD不变预测价格"]
     title2 = ["股票名称", "当日涨跌幅", "估算DIFF贯穿天数", "DIFF下方天数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF不变预测价格"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(MACDDIFF_Model_Select_pipeline, os.listdir(stockdata_path))
@@ -956,7 +961,7 @@ def MACDDIFF_Model_Select_pipeline(filename):
     MACD_list = [0]
     MACD_result = []
     DIFF_result = []
-    for ii in reversed(range(min(100, len(stockdata_list)))):
+    for ii in reversed(range(min(200, len(stockdata_list)))):
         EMA12 = 11/13*EMA12 + 2/13*float(stockdata_list[ii][3])
         EMA26 = 25/27*EMA26 + 2/27*float(stockdata_list[ii][3])
         DIFF = EMA12 - EMA26
@@ -992,6 +997,156 @@ def MACDDIFF_Model_Select_pipeline(filename):
         DIFF_slope = (DIFF_list[-1]-DIFF_list[-2])/float(stockdata_list[0][3])
         DEA_ratio = DEA9_list[-1]/float(stockdata_list[0][3])
         DIFF_ratio = DIFF_list[-1]/DEA9_list[-1]
+        DIFF_result = [stockinfo, stockdata_list[0][9], DIFF_predict, DIFF_counter, round(DIFF_ratio,2), DEA_ratio, DIFF_slope, stockdata_list[0][3], round(cross_price, 2), round(parallel_price, 2)]
+    return MACD_result, DIFF_result
+
+
+def MACDDIFFShort_Model_Select():
+# MACD 模型 (6,10,5) & 中间量 DIFF 模型
+    resultfile_path1 = os.path.join(resultdata_path, "MACDShort_Model_Select_Result.csv")
+    resultfile_path2 = os.path.join(resultdata_path, "DIFFShort_Model_Select_Result.csv")
+    title1 = ["股票名称", "当日涨跌幅", "估算MACD贯穿天数", "MACD下方天数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格", "MACD不变预测价格"]
+    title2 = ["股票名称", "当日涨跌幅", "估算DIFF贯穿天数", "DIFF下方天数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF不变预测价格"]
+    resultdata_list1 = []
+    resultdata_list2 = []
+    for filename in os.listdir(stockdata_path):
+        MACD_result, DIFF_result = MACDDIFFShort_Model_Select_pipeline(filename)
+        resultdata_list1.append(MACD_result)
+        resultdata_list2.append(DIFF_result)
+    write_csvfile(resultfile_path1, title1, resultdata_list1)
+    write_csvfile(resultfile_path2, title2, resultdata_list2)
+def MACDDIFFShort_Model_Select_par():
+    resultfile_path1 = os.path.join(resultdata_path, "MACDShort_Model_Select_Result.csv")
+    resultfile_path2 = os.path.join(resultdata_path, "DIFFShort_Model_Select_Result.csv")
+    title1 = ["股票名称", "当日涨跌幅", "估算MACD贯穿天数", "MACD下方天数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格", "MACD不变预测价格"]
+    title2 = ["股票名称", "当日涨跌幅", "估算DIFF贯穿天数", "DIFF下方天数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF不变预测价格"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(MACDDIFFShort_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path1, title1, [item[0] for item in resultdata_list])
+    write_csvfile(resultfile_path2, title2, [item[1] for item in resultdata_list])
+def MACDDIFFShort_Model_Select_pipeline(filename):
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    EMA6 = 0
+    EMA10 = 0
+    DIFF_list = [0]
+    DEA5_list = [0]
+    MACD_list = [0]
+    MACD_result = []
+    DIFF_result = []
+    for ii in reversed(range(min(200, len(stockdata_list)))):
+        EMA6 = 5/7*EMA6 + 2/7*float(stockdata_list[ii][3])
+        EMA10 = 9/11*EMA10 + 2/11*float(stockdata_list[ii][3])
+        DIFF = EMA6 - EMA10
+        DEA5 = 4/6*DEA5_list[-1] + 2/6*DIFF
+        MACD = (DIFF-DEA5)*2
+        DIFF_list.append(DIFF)
+        DEA5_list.append(DEA5)
+        MACD_list.append(MACD)
+    if((MACD_list[-2]<0) and (MACD_list[-1]>MACD_list[-2]) and (DEA5_list[-2]<0)):
+        MACD_counter = 1
+        for ii in reversed(range(len(MACD_list)-1)):
+            if((MACD_list[ii]<0) or (DIFF_list[ii]<0)):
+                MACD_counter+=1
+            else:
+                break
+        MACD_range = (float(stockdata_list[0][3])-float(stockdata_list[MACD_counter-1][3]))/float(stockdata_list[MACD_counter-1][3])*100
+        MACD_predict = math.ceil(MACD_list[-1]/(MACD_list[-2]-MACD_list[-1]))
+        cross_price = (DEA5_list[-1]-5/7*EMA6+9/11*EMA10)/(2/7-2/11)
+        parallel_price = (3/4*MACD+DEA5_list[-1]-5/7*EMA6+9/11*EMA10)/(2/7-2/11)
+        MACD_slope = (MACD_list[-1]-MACD_list[-2])/float(stockdata_list[0][3])
+        DEA_ratio = DEA5_list[-1]/float(stockdata_list[0][3])
+        MACD_result = [stockinfo, stockdata_list[0][9], MACD_predict, MACD_counter, DEA_ratio, MACD_range, MACD_slope, stockdata_list[0][3], round(cross_price,2), round(parallel_price,2)]
+    if((DIFF_list[-2]<0) and (DIFF_list[-1]>DIFF_list[-2])):
+        DIFF_counter = 1
+        for ii in reversed(range(len(DIFF_list)-1)):
+            if(DIFF_list[ii]<0):
+                DIFF_counter+=1
+            else:
+                break
+        DIFF_predict = math.ceil(DIFF_list[-1]/(DIFF_list[-2]-DIFF_list[-1]))
+        cross_price = (9/11*EMA10-5/7*EMA6)/(2/7-2/11)
+        parallel_price = (DIFF_list[-1]+9/11*EMA10-5/7*EMA6)/(2/7-2/11)
+        DIFF_slope = (DIFF_list[-1]-DIFF_list[-2])/float(stockdata_list[0][3])
+        DEA_ratio = DEA5_list[-1]/float(stockdata_list[0][3])
+        DIFF_ratio = DIFF_list[-1]/DEA5_list[-1]
+        DIFF_result = [stockinfo, stockdata_list[0][9], DIFF_predict, DIFF_counter, round(DIFF_ratio,2), DEA_ratio, DIFF_slope, stockdata_list[0][3], round(cross_price, 2), round(parallel_price, 2)]
+    return MACD_result, DIFF_result
+
+
+def MACDDIFFLong_Model_Select():
+# MACD 模型 (21,34,8) & 中间量 DIFF 模型
+    resultfile_path1 = os.path.join(resultdata_path, "MACDLong_Model_Select_Result.csv")
+    resultfile_path2 = os.path.join(resultdata_path, "DIFFLong_Model_Select_Result.csv")
+    title1 = ["股票名称", "当日涨跌幅", "估算MACD贯穿天数", "MACD下方天数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格", "MACD不变预测价格"]
+    title2 = ["股票名称", "当日涨跌幅", "估算DIFF贯穿天数", "DIFF下方天数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF不变预测价格"]
+    resultdata_list1 = []
+    resultdata_list2 = []
+    for filename in os.listdir(stockdata_path):
+        MACD_result, DIFF_result = MACDDIFFLong_Model_Select_pipeline(filename)
+        resultdata_list1.append(MACD_result)
+        resultdata_list2.append(DIFF_result)
+    write_csvfile(resultfile_path1, title1, resultdata_list1)
+    write_csvfile(resultfile_path2, title2, resultdata_list2)
+def MACDDIFFLong_Model_Select_par():
+    resultfile_path1 = os.path.join(resultdata_path, "MACDLong_Model_Select_Result.csv")
+    resultfile_path2 = os.path.join(resultdata_path, "DIFFLong_Model_Select_Result.csv")
+    title1 = ["股票名称", "当日涨跌幅", "估算MACD贯穿天数", "MACD下方天数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格", "MACD不变预测价格"]
+    title2 = ["股票名称", "当日涨跌幅", "估算DIFF贯穿天数", "DIFF下方天数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF不变预测价格"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(MACDDIFFLong_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path1, title1, [item[0] for item in resultdata_list])
+    write_csvfile(resultfile_path2, title2, [item[1] for item in resultdata_list])
+def MACDDIFFLong_Model_Select_pipeline(filename):
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    EMA21 = 0
+    EMA34 = 0
+    DIFF_list = [0]
+    DEA8_list = [0]
+    MACD_list = [0]
+    MACD_result = []
+    DIFF_result = []
+    for ii in reversed(range(min(200, len(stockdata_list)))):
+        EMA21 = 20/22*EMA21 + 2/22*float(stockdata_list[ii][3])
+        EMA34 = 33/35*EMA34 + 2/35*float(stockdata_list[ii][3])
+        DIFF = EMA21 - EMA34
+        DEA8 = 7/9*DEA8_list[-1] + 2/9*DIFF
+        MACD = (DIFF-DEA8)*2
+        DIFF_list.append(DIFF)
+        DEA8_list.append(DEA8)
+        MACD_list.append(MACD)
+    if((MACD_list[-2]<0) and (MACD_list[-1]>MACD_list[-2]) and (DEA8_list[-2]<0)):
+        MACD_counter = 1
+        for ii in reversed(range(len(MACD_list)-1)):
+            if((MACD_list[ii]<0) or (DIFF_list[ii]<0)):
+                MACD_counter+=1
+            else:
+                break
+        MACD_range = (float(stockdata_list[0][3])-float(stockdata_list[MACD_counter-1][3]))/float(stockdata_list[MACD_counter-1][3])*100
+        MACD_predict = math.ceil(MACD_list[-1]/(MACD_list[-2]-MACD_list[-1]))
+        cross_price = (DEA8_list[-1]-20/22*EMA21+33/35*EMA34)/(2/22-2/35)
+        parallel_price = (9/14*MACD+DEA8_list[-1]-20/22*EMA21+33/35*EMA34)/(2/22-2/35)
+        MACD_slope = (MACD_list[-1]-MACD_list[-2])/float(stockdata_list[0][3])
+        DEA_ratio = DEA8_list[-1]/float(stockdata_list[0][3])
+        MACD_result = [stockinfo, stockdata_list[0][9], MACD_predict, MACD_counter, DEA_ratio, MACD_range, MACD_slope, stockdata_list[0][3], round(cross_price,2), round(parallel_price,2)]
+    if((DIFF_list[-2]<0) and (DIFF_list[-1]>DIFF_list[-2])):
+        DIFF_counter = 1
+        for ii in reversed(range(len(DIFF_list)-1)):
+            if(DIFF_list[ii]<0):
+                DIFF_counter+=1
+            else:
+                break
+        DIFF_predict = math.ceil(DIFF_list[-1]/(DIFF_list[-2]-DIFF_list[-1]))
+        cross_price = (33/35*EMA34-20/22*EMA21)/(2/22-2/35)
+        parallel_price = (DIFF_list[-1]+33/35*EMA34-20/22*EMA21)/(2/22-2/35)
+        DIFF_slope = (DIFF_list[-1]-DIFF_list[-2])/float(stockdata_list[0][3])
+        DEA_ratio = DEA8_list[-1]/float(stockdata_list[0][3])
+        DIFF_ratio = DIFF_list[-1]/DEA8_list[-1]
         DIFF_result = [stockinfo, stockdata_list[0][9], DIFF_predict, DIFF_counter, round(DIFF_ratio,2), DEA_ratio, DIFF_slope, stockdata_list[0][3], round(cross_price, 2), round(parallel_price, 2)]
     return MACD_result, DIFF_result
 
@@ -1794,6 +1949,14 @@ def analyze_stockdata():
 #    MACDDIFF_Model_Select()
     MACDDIFF_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMACDDIFF_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMACDDIFFShort_Model_Select Begin!")
+#    MACDDIFFShort_Model_Select()
+    MACDDIFFShort_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMACDDIFFShort_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMACDDIFFLong_Model_Select Begin!")
+#    MACDDIFFLong_Model_Select()
+    MACDDIFFLong_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMACDDIFFLong_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tKDJ_Model_Select Begin!")
 #    KDJ_Model_Select()
     KDJ_Model_Select_par()
