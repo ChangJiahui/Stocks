@@ -67,8 +67,8 @@ def write_csvfile(filename, title, data_list):
 
 
 def insert_csvfile(filename, data_list):
-    with open(filename, 'a') as fp:
-        fp.write(",".join([str(item) for item in data_list]) + "\n")
+    title, stockdata_list = read_csvfile(filename)
+    write_csvfile(filename, title, data_list+stockdata_list)
 
 
 def read_xlsfile(filename):
@@ -92,26 +92,18 @@ def get_htmltext(url):
 #            print("Get Successfully: " + url)
             if(response.status_code!=200):
                 return ""
-            break
+            try:
+                html_text = response.content.decode('utf8')
+            except UnicodeDecodeError as e:
+#                print(e)
+                html_text = response.content.decode('gbk')
+#            except NameError as e:
+#                print(e)
+#                html_text = ""
+            return html_text
         except Exception as e:
             print(e)
-            continue
-#    print(response.text)
-    try:
-        html_text = response.content.decode('utf8')
-    except UnicodeDecodeError as e:
-#        print(e)
-        html_text = response.content.decode('gbk')
-#    except NameError as e:
-#        print(e)
-#        html_text = ""
-    except Exception as e:
-        print(e)
-        html_text = ""
-    if(html_text.startswith(u'\ufeff')):
-        html_text = ""
-        return html_text
-    return html_text
+    return ""
 
 
 def download_file(url, filename):
@@ -119,20 +111,15 @@ def download_file(url, filename):
         time.sleep(random.choice([1,2]))
         try:
             data = requests.get(url)
-            break
+            with open(filename, 'wb') as fp:
+                chunk_size = 100000
+                for chunk in data.iter_content(chunk_size):
+                    fp.write(chunk)
+#            print("Download Successfully: " + url)
+            return True
         except Exception as e:
             print(e)
-            continue
-    try:
-        with open(filename, 'wb') as fp:
-            chunk_size = 100000
-            for chunk in data.iter_content(chunk_size):
-                fp.write(chunk)
-#        print("Download Successfully: " + url)
-        return True
-    except Exception as e:
-        print(e)
-        return False
+    return False
 
 
 def get_jsvar(url, varname):
@@ -168,7 +155,7 @@ def check_stockdata(filename):
             proportion = float(stockdata_list[ii-1][7])/float(stockdata_list[ii][3])
             for jj in range(ii, len(stockdata_list)):
                 for kk in range(3,9):
-                    stockdata_list[jj][kk] = round(float(stockdata_list[jj][kk])*proportion, 2)
+                    stockdata_list[jj][kk] = round(float(stockdata_list[jj][kk])*proportion,2)
     if(stockdata_list==[]):
         os.remove(filename)
     elif((float(stockdata_list[0][4])==float(stockdata_list[0][5])) or ("ST" in stockdata_list[0][2])):
@@ -567,7 +554,7 @@ def shadow_Model_Select_pipeline(filename):
     shadow_range = (min(float(stockdata_list[0][3]), float(stockdata_list[0][6]))-float(stockdata_list[0][5]))/float(stockdata_list[0][7])*100
     cylinder_range = (float(stockdata_list[0][3]) - float(stockdata_list[0][6]))/float(stockdata_list[0][7])*100
     if((float(stockdata_list[0][9])<3) and (shadow_range>3) and (float(stockdata_list[0][5])<min([float(item[3]) for item in stockdata_list[:30]]))):
-        return [stockinfo, stockdata_list[0][9], round(open_range,2), round(cylinder_range,2), round(shadow_range,2), stockdata_list[0][3], stockdata_list[0][6], stockdata_list[0][4], stockdata_list[0][5], round(rebound_range, 2), round(float(stockdata_list[0][10])/float(stockdata_list[1][10]),2)]
+        return [stockinfo, stockdata_list[0][9], round(open_range,2), round(cylinder_range,2), round(shadow_range,2), stockdata_list[0][3], stockdata_list[0][6], stockdata_list[0][4], stockdata_list[0][5], round(rebound_range,2), round(float(stockdata_list[0][10])/float(stockdata_list[1][10]),2)]
     else:
         return []
 
@@ -706,14 +693,14 @@ def wave_Model_Select_pipeline(filename):
 def volumn_Model_Select():
 # 放量模型
     resultfile_path = os.path.join(resultdata_path, "volumn_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "放量倍数", "百日位置(%)", "5日总涨跌幅", "10日总涨跌幅", "30日总涨跌幅", "当前价格"]
+    title = ["股票名称", "当日涨跌幅", "放量倍数", "百日位置(%)", "5日总涨跌幅", "10日总涨跌幅", "30日总涨跌幅"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         resultdata_list.append(volumn_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
 def volumn_Model_Select_par():
     resultfile_path = os.path.join(resultdata_path, "volumn_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "放量倍数", "百日位置(%)", "5日总涨跌幅", "10日总涨跌幅", "30日总涨跌幅", "当前价格"]
+    title = ["股票名称", "当日涨跌幅", "放量倍数", "百日位置(%)", "5日总涨跌幅", "10日总涨跌幅", "30日总涨跌幅"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(volumn_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -773,9 +760,9 @@ def trend_Model_Select_pipeline(filename):
                 break
         trend_range = (float(stockdata_list[0][3])-float(stockdata_list[trend_counter][3]))/float(stockdata_list[trend_counter][3])*100
         trend_predict = math.ceil(DIFF_list[0]/(DIFF_list[1]-DIFF_list[0]))
-        cross_price = round(sum([float(item[3]) for item in stockdata_list[:4]])/4, 2)
-        parallel_price = round((5*DIFF_list[-1]/4+cross_price), 2)
-        return [stockinfo, stockdata_list[0][9], trend_predict, trend_counter, trend_range, stockdata_list[0][3], cross_price, parallel_price]
+        cross_price = sum([float(item[3]) for item in stockdata_list[:4]])/4
+        parallel_price = 5*DIFF_list[-1]/4+cross_price
+        return [stockinfo, stockdata_list[0][9], trend_predict, trend_counter, trend_range, stockdata_list[0][3], round(cross_price,2), round(parallel_price,2)]
     else:
         return []
 
@@ -817,9 +804,9 @@ def trend5_Model_Select_pipeline(filename):
                 break
         trend_range = (float(stockdata_list[0][3])-float(stockdata_list[trend_counter][3]))/float(stockdata_list[trend_counter][3])*100
         trend_predict = math.ceil(DIFF_list[0]/(DIFF_list[1]-DIFF_list[0]))
-        cross_price = round(sum([float(item[3]) for item in stockdata_list[:9]])-2*sum([float(item[3]) for item in stockdata_list[:4]]), 2)
-        parallel_price = round((10*DIFF_list[-1]+cross_price), 2)
-        return [stockinfo, stockdata_list[0][9], trend_predict, trend_counter, trend_range, stockdata_list[0][3], cross_price, parallel_price]
+        cross_price = sum([float(item[3]) for item in stockdata_list[:9]])-2*sum([float(item[3]) for item in stockdata_list[:4]])
+        parallel_price = 10*DIFF_list[-1]+cross_price
+        return [stockinfo, stockdata_list[0][9], trend_predict, trend_counter, trend_range, stockdata_list[0][3], round(cross_price,2), round(parallel_price,2)]
     else:
         return []
 
@@ -861,9 +848,9 @@ def trend10_Model_Select_pipeline(filename):
                 break
         trend_range = (float(stockdata_list[0][3])-float(stockdata_list[trend_counter][3]))/float(stockdata_list[trend_counter][3])*100
         trend_predict = math.ceil(DIFF_list[0]/(DIFF_list[1]-DIFF_list[0]))
-        cross_price = round((sum([float(item[3]) for item in stockdata_list[:29]])-3*sum([float(item[3]) for item in stockdata_list[:9]]))/2, 2)
-        parallel_price = round((15*DIFF_list[-1]+cross_price), 2)
-        return [stockinfo, stockdata_list[0][9], trend_predict, trend_counter, trend_range, stockdata_list[0][3], cross_price, parallel_price]
+        cross_price = (sum([float(item[3]) for item in stockdata_list[:29]])-3*sum([float(item[3]) for item in stockdata_list[:9]]))/2
+        parallel_price = 15*DIFF_list[-1]+cross_price
+        return [stockinfo, stockdata_list[0][9], trend_predict, trend_counter, trend_range, stockdata_list[0][3], round(cross_price,2), round(parallel_price,2)]
     else:
         return []
 
@@ -919,9 +906,9 @@ def KDJ_Model_Select_pipeline(filename):
                 break
         KDJ_range = (float(stockdata_list[0][3])-float(stockdata_list[KDJ_counter-1][3]))/float(stockdata_list[KDJ_counter-1][3])*100
         KDJ_predict = math.ceil(KDJ_list[-1]/(KDJ_list[-2]-KDJ_list[-1]))
-        K_price = round((H9-L9)*K_list[-1]/100+L9, 2)
+        K_price = (H9-L9)*K_list[-1]/100+L9
         KDJ_slope = ((K_list[-1]-D_list[-1])-(K_list[-2]-D_list[-2]))/((K_list[-1]+D_list[-1])/2)
-        return [stockinfo, stockdata_list[0][9], KDJ_predict, KDJ_counter, KDJ_range, stockdata_list[0][3], K_price, KDJ_slope, K_list[-1], D_list[-1], J_list[-1], RSV]
+        return [stockinfo, stockdata_list[0][9], KDJ_predict, KDJ_counter, KDJ_range, stockdata_list[0][3], round(K_price,2), KDJ_slope, K_list[-1], D_list[-1], J_list[-1], RSV]
     else:
         return []
 
@@ -930,8 +917,8 @@ def MACDDIFF_Model_Select():
 # MACD 模型 (12,26,9) & 中间量 DIFF 模型
     resultfile_path1 = os.path.join(resultdata_path, "MACD_Model_Select_Result.csv")
     resultfile_path2 = os.path.join(resultdata_path, "DIFF_Model_Select_Result.csv")
-    title1 = ["股票名称", "当日涨跌幅", "估算MACD贯穿天数", "MACD下方天数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格", "MACD不变预测价格"]
-    title2 = ["股票名称", "当日涨跌幅", "估算DIFF贯穿天数", "DIFF下方天数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF不变预测价格"]
+    title1 = ["股票名称", "当日涨跌幅", "估算MACD贯穿天数", "MACD下方天数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格",  "MACD平行预测价格", "MACD不变预测价格"]
+    title2 = ["股票名称", "当日涨跌幅", "估算DIFF贯穿天数", "DIFF下方天数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF平行预测价格", "DIFF不变预测价格"]
     resultdata_list1 = []
     resultdata_list2 = []
     for filename in os.listdir(stockdata_path):
@@ -943,8 +930,8 @@ def MACDDIFF_Model_Select():
 def MACDDIFF_Model_Select_par():
     resultfile_path1 = os.path.join(resultdata_path, "MACD_Model_Select_Result.csv")
     resultfile_path2 = os.path.join(resultdata_path, "DIFF_Model_Select_Result.csv")
-    title1 = ["股票名称", "当日涨跌幅", "估算MACD贯穿天数", "MACD下方天数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格", "MACD不变预测价格"]
-    title2 = ["股票名称", "当日涨跌幅", "估算DIFF贯穿天数", "DIFF下方天数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF不变预测价格"]
+    title1 = ["股票名称", "当日涨跌幅", "估算MACD贯穿天数", "MACD下方天数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格",  "MACD平行预测价格", "MACD不变预测价格"]
+    title2 = ["股票名称", "当日涨跌幅", "估算DIFF贯穿天数", "DIFF下方天数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF平行预测价格", "DIFF不变预测价格"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(MACDDIFF_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -980,10 +967,11 @@ def MACDDIFF_Model_Select_pipeline(filename):
         MACD_range = (float(stockdata_list[0][3])-float(stockdata_list[MACD_counter-1][3]))/float(stockdata_list[MACD_counter-1][3])*100
         MACD_predict = math.ceil(MACD_list[-1]/(MACD_list[-2]-MACD_list[-1]))
         cross_price = (DEA9_list[-1]-11/13*EMA12+25/27*EMA26)/(2/13-2/27)
+        slope_price = ((5/8*(MACD_list[-1]*2-MACD_list[-2])+DEA9_list[-1]-11/13*EMA12+25/27*EMA26)/(2/13-2/27))
         parallel_price = (5/8*MACD+DEA9_list[-1]-11/13*EMA12+25/27*EMA26)/(2/13-2/27)
         MACD_slope = (MACD_list[-1]-MACD_list[-2])/float(stockdata_list[0][3])
         DEA_ratio = DEA9_list[-1]/float(stockdata_list[0][3])
-        MACD_result = [stockinfo, stockdata_list[0][9], MACD_predict, MACD_counter, DEA_ratio, MACD_range, MACD_slope, stockdata_list[0][3], round(cross_price,2), round(parallel_price,2)]
+        MACD_result = [stockinfo, stockdata_list[0][9], MACD_predict, MACD_counter, DEA_ratio, MACD_range, MACD_slope, stockdata_list[0][3], round(cross_price,2), round(slope_price,2), round(parallel_price,2)]
     if((DIFF_list[-2]<0) and (DIFF_list[-1]>DIFF_list[-2])):
         DIFF_counter = 1
         for ii in reversed(range(len(DIFF_list)-1)):
@@ -993,11 +981,12 @@ def MACDDIFF_Model_Select_pipeline(filename):
                 break
         DIFF_predict = math.ceil(DIFF_list[-1]/(DIFF_list[-2]-DIFF_list[-1]))
         cross_price = (25/27*EMA26-11/13*EMA12)/(2/13-2/27)
+        slope_price = (2*DIFF_list[-1]-DIFF_list[-2]+25/27*EMA26-11/13*EMA12)/(2/13-2/27)
         parallel_price = (DIFF_list[-1]+25/27*EMA26-11/13*EMA12)/(2/13-2/27)
         DIFF_slope = (DIFF_list[-1]-DIFF_list[-2])/float(stockdata_list[0][3])
         DEA_ratio = DEA9_list[-1]/float(stockdata_list[0][3])
         DIFF_ratio = DIFF_list[-1]/DEA9_list[-1]
-        DIFF_result = [stockinfo, stockdata_list[0][9], DIFF_predict, DIFF_counter, round(DIFF_ratio,2), DEA_ratio, DIFF_slope, stockdata_list[0][3], round(cross_price, 2), round(parallel_price, 2)]
+        DIFF_result = [stockinfo, stockdata_list[0][9], DIFF_predict, DIFF_counter, round(DIFF_ratio,2), DEA_ratio, DIFF_slope, stockdata_list[0][3], round(cross_price,2), round(slope_price,2), round(parallel_price,2)]
     return MACD_result, DIFF_result
 
 
@@ -1005,8 +994,8 @@ def MACDDIFFShort_Model_Select():
 # MACD 模型 (6,10,5) & 中间量 DIFF 模型
     resultfile_path1 = os.path.join(resultdata_path, "MACDShort_Model_Select_Result.csv")
     resultfile_path2 = os.path.join(resultdata_path, "DIFFShort_Model_Select_Result.csv")
-    title1 = ["股票名称", "当日涨跌幅", "估算MACD贯穿天数", "MACD下方天数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格", "MACD不变预测价格"]
-    title2 = ["股票名称", "当日涨跌幅", "估算DIFF贯穿天数", "DIFF下方天数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF不变预测价格"]
+    title1 = ["股票名称", "当日涨跌幅", "估算MACD贯穿天数", "MACD下方天数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格", "MACD平行预测价格", "MACD不变预测价格"]
+    title2 = ["股票名称", "当日涨跌幅", "估算DIFF贯穿天数", "DIFF下方天数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF平行预测价格", "DIFF不变预测价格"]
     resultdata_list1 = []
     resultdata_list2 = []
     for filename in os.listdir(stockdata_path):
@@ -1018,8 +1007,8 @@ def MACDDIFFShort_Model_Select():
 def MACDDIFFShort_Model_Select_par():
     resultfile_path1 = os.path.join(resultdata_path, "MACDShort_Model_Select_Result.csv")
     resultfile_path2 = os.path.join(resultdata_path, "DIFFShort_Model_Select_Result.csv")
-    title1 = ["股票名称", "当日涨跌幅", "估算MACD贯穿天数", "MACD下方天数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格", "MACD不变预测价格"]
-    title2 = ["股票名称", "当日涨跌幅", "估算DIFF贯穿天数", "DIFF下方天数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF不变预测价格"]
+    title1 = ["股票名称", "当日涨跌幅", "估算MACD贯穿天数", "MACD下方天数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格", "MACD平行预测价格", "MACD不变预测价格"]
+    title2 = ["股票名称", "当日涨跌幅", "估算DIFF贯穿天数", "DIFF下方天数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF平行预测价格", "DIFF不变预测价格"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(MACDDIFFShort_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -1055,10 +1044,11 @@ def MACDDIFFShort_Model_Select_pipeline(filename):
         MACD_range = (float(stockdata_list[0][3])-float(stockdata_list[MACD_counter-1][3]))/float(stockdata_list[MACD_counter-1][3])*100
         MACD_predict = math.ceil(MACD_list[-1]/(MACD_list[-2]-MACD_list[-1]))
         cross_price = (DEA5_list[-1]-5/7*EMA6+9/11*EMA10)/(2/7-2/11)
+        slope_price = (3/4*(MACD_list[-1]*2-MACD_list[-2])+DEA5_list[-1]-5/7*EMA6+9/11*EMA10)/(2/7-2/11)
         parallel_price = (3/4*MACD+DEA5_list[-1]-5/7*EMA6+9/11*EMA10)/(2/7-2/11)
         MACD_slope = (MACD_list[-1]-MACD_list[-2])/float(stockdata_list[0][3])
         DEA_ratio = DEA5_list[-1]/float(stockdata_list[0][3])
-        MACD_result = [stockinfo, stockdata_list[0][9], MACD_predict, MACD_counter, DEA_ratio, MACD_range, MACD_slope, stockdata_list[0][3], round(cross_price,2), round(parallel_price,2)]
+        MACD_result = [stockinfo, stockdata_list[0][9], MACD_predict, MACD_counter, DEA_ratio, MACD_range, MACD_slope, stockdata_list[0][3], round(cross_price,2), round(slope_price,2), round(parallel_price,2)]
     if((DIFF_list[-2]<0) and (DIFF_list[-1]>DIFF_list[-2])):
         DIFF_counter = 1
         for ii in reversed(range(len(DIFF_list)-1)):
@@ -1068,11 +1058,12 @@ def MACDDIFFShort_Model_Select_pipeline(filename):
                 break
         DIFF_predict = math.ceil(DIFF_list[-1]/(DIFF_list[-2]-DIFF_list[-1]))
         cross_price = (9/11*EMA10-5/7*EMA6)/(2/7-2/11)
+        slope_price = (2*DIFF_list[-1]-DIFF_list[-2]+9/11*EMA10-5/7*EMA6)/(2/7-2/11)
         parallel_price = (DIFF_list[-1]+9/11*EMA10-5/7*EMA6)/(2/7-2/11)
         DIFF_slope = (DIFF_list[-1]-DIFF_list[-2])/float(stockdata_list[0][3])
         DEA_ratio = DEA5_list[-1]/float(stockdata_list[0][3])
         DIFF_ratio = DIFF_list[-1]/DEA5_list[-1]
-        DIFF_result = [stockinfo, stockdata_list[0][9], DIFF_predict, DIFF_counter, round(DIFF_ratio,2), DEA_ratio, DIFF_slope, stockdata_list[0][3], round(cross_price, 2), round(parallel_price, 2)]
+        DIFF_result = [stockinfo, stockdata_list[0][9], DIFF_predict, DIFF_counter, round(DIFF_ratio,2), DEA_ratio, DIFF_slope, stockdata_list[0][3], round(cross_price,2), round(slope_price,2), round(parallel_price,2)]
     return MACD_result, DIFF_result
 
 
@@ -1080,8 +1071,8 @@ def MACDDIFFLong_Model_Select():
 # MACD 模型 (21,34,8) & 中间量 DIFF 模型
     resultfile_path1 = os.path.join(resultdata_path, "MACDLong_Model_Select_Result.csv")
     resultfile_path2 = os.path.join(resultdata_path, "DIFFLong_Model_Select_Result.csv")
-    title1 = ["股票名称", "当日涨跌幅", "估算MACD贯穿天数", "MACD下方天数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格", "MACD不变预测价格"]
-    title2 = ["股票名称", "当日涨跌幅", "估算DIFF贯穿天数", "DIFF下方天数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF不变预测价格"]
+    title1 = ["股票名称", "当日涨跌幅", "估算MACD贯穿天数", "MACD下方天数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格", "MACD平行预测价格", "MACD不变预测价格"]
+    title2 = ["股票名称", "当日涨跌幅", "估算DIFF贯穿天数", "DIFF下方天数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF平行预测价格", "DIFF不变预测价格"]
     resultdata_list1 = []
     resultdata_list2 = []
     for filename in os.listdir(stockdata_path):
@@ -1093,8 +1084,8 @@ def MACDDIFFLong_Model_Select():
 def MACDDIFFLong_Model_Select_par():
     resultfile_path1 = os.path.join(resultdata_path, "MACDLong_Model_Select_Result.csv")
     resultfile_path2 = os.path.join(resultdata_path, "DIFFLong_Model_Select_Result.csv")
-    title1 = ["股票名称", "当日涨跌幅", "估算MACD贯穿天数", "MACD下方天数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格", "MACD不变预测价格"]
-    title2 = ["股票名称", "当日涨跌幅", "估算DIFF贯穿天数", "DIFF下方天数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF不变预测价格"]
+    title1 = ["股票名称", "当日涨跌幅", "估算MACD贯穿天数", "MACD下方天数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格", "MACD平行预测价格", "MACD不变预测价格"]
+    title2 = ["股票名称", "当日涨跌幅", "估算DIFF贯穿天数", "DIFF下方天数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF平行预测价格", "DIFF不变预测价格"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(MACDDIFFLong_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -1130,10 +1121,11 @@ def MACDDIFFLong_Model_Select_pipeline(filename):
         MACD_range = (float(stockdata_list[0][3])-float(stockdata_list[MACD_counter-1][3]))/float(stockdata_list[MACD_counter-1][3])*100
         MACD_predict = math.ceil(MACD_list[-1]/(MACD_list[-2]-MACD_list[-1]))
         cross_price = (DEA8_list[-1]-20/22*EMA21+33/35*EMA34)/(2/22-2/35)
+        slope_price = (9/14*(MACD_list[-1]*2-MACD_list[-2])+DEA8_list[-1]-20/22*EMA21+33/35*EMA34)/(2/22-2/35)
         parallel_price = (9/14*MACD+DEA8_list[-1]-20/22*EMA21+33/35*EMA34)/(2/22-2/35)
         MACD_slope = (MACD_list[-1]-MACD_list[-2])/float(stockdata_list[0][3])
         DEA_ratio = DEA8_list[-1]/float(stockdata_list[0][3])
-        MACD_result = [stockinfo, stockdata_list[0][9], MACD_predict, MACD_counter, DEA_ratio, MACD_range, MACD_slope, stockdata_list[0][3], round(cross_price,2), round(parallel_price,2)]
+        MACD_result = [stockinfo, stockdata_list[0][9], MACD_predict, MACD_counter, DEA_ratio, MACD_range, MACD_slope, stockdata_list[0][3], round(cross_price,2), round(slope_price,2), round(parallel_price,2)]
     if((DIFF_list[-2]<0) and (DIFF_list[-1]>DIFF_list[-2])):
         DIFF_counter = 1
         for ii in reversed(range(len(DIFF_list)-1)):
@@ -1143,11 +1135,12 @@ def MACDDIFFLong_Model_Select_pipeline(filename):
                 break
         DIFF_predict = math.ceil(DIFF_list[-1]/(DIFF_list[-2]-DIFF_list[-1]))
         cross_price = (33/35*EMA34-20/22*EMA21)/(2/22-2/35)
+        slope_price = (2*DIFF_list[-1]-DIFF_list[-2]+33/35*EMA34-20/22*EMA21)/(2/22-2/35)
         parallel_price = (DIFF_list[-1]+33/35*EMA34-20/22*EMA21)/(2/22-2/35)
         DIFF_slope = (DIFF_list[-1]-DIFF_list[-2])/float(stockdata_list[0][3])
         DEA_ratio = DEA8_list[-1]/float(stockdata_list[0][3])
         DIFF_ratio = DIFF_list[-1]/DEA8_list[-1]
-        DIFF_result = [stockinfo, stockdata_list[0][9], DIFF_predict, DIFF_counter, round(DIFF_ratio,2), DEA_ratio, DIFF_slope, stockdata_list[0][3], round(cross_price, 2), round(parallel_price, 2)]
+        DIFF_result = [stockinfo, stockdata_list[0][9], DIFF_predict, DIFF_counter, round(DIFF_ratio,2), DEA_ratio, DIFF_slope, stockdata_list[0][3], round(cross_price,2), round(slope_price,2), round(parallel_price,2)]
     return MACD_result, DIFF_result
 
 
@@ -1398,7 +1391,7 @@ def AHCom_Model_Select():
                 for AHdataNew in AHdataNew_list:
                     AHfilename = os.path.join(AHdata_path, (str(AHdataNew[0]) + "_" + str(AHdataNew[2]).format(7) + ".csv"))
                     if(os.path.exists(AHfilename)):
-                        insert_csvfile(AHfilename, ([end_time]+AHdataNew))
+                        insert_csvfile(AHfilename, [[end_time]+AHdataNew])
                     else:
                         write_csvfile(AHfilename, AHdata_title, ([[end_time]+AHdataNew]))
                 return True
@@ -1411,9 +1404,9 @@ def AHCom_Model_Select():
         for filename in os.listdir(AHdata_path):
             _, AHdata_list = read_csvfile(os.path.join(AHdata_path, filename))
             stockinfo = filename.split(".")[0]
-            stockHinfo = (str(AHdata_list[-1][7])+"_"+str(AHdata_list[-1][6]).format(5))
+            stockHinfo = (str(AHdata_list[0][7])+"_"+str(AHdata_list[0][6]).format(5))
             AHComCounter = 0
-            for ii in reversed(range(len(AHdata_list))):
+            for ii in range(len(AHdata_list)):
                 if(float(AHdata_list[ii][5])<float(AHdata_list[ii][9])):
                     AHComCounter += 1
                 else:
@@ -1424,7 +1417,7 @@ def AHCom_Model_Select():
             HStock_range = (float(AHdata_list[0][8])-float(AHdata_list[AHComCounter][8]))/float(AHdata_list[AHComCounter][8])*100
             AHCom_range = HStock_range - AStock_range
             AHCom30_range = (float(AHdata_list[0][8])-float(AHdata_list[min(30,len(AHdata_list)-1)][8]))/float(AHdata_list[min(30,len(AHdata_list)-1)][8])*100 - (float(AHdata_list[0][4])-float(AHdata_list[min(30,len(AHdata_list)-1)][4]))/float(AHdata_list[min(30,len(AHdata_list)-1)][4])*100
-            resultdata_list.append([stockinfo, stockHinfo, AHComCounter, AHdata_list[-1][5], AStock_range, HStock_range, AHCom_range, AHCom30_range])
+            resultdata_list.append([stockinfo, stockHinfo, AHComCounter, AHdata_list[0][5], AStock_range, HStock_range, AHCom_range, AHCom30_range])
         write_csvfile(resultfile_path, title, resultdata_list)
 
 
@@ -1475,7 +1468,7 @@ def ABCom_Model_Select():
                 for ABdataNew in ABdataNew_list:
                     ABfilename = os.path.join(ABdata_path, (str(ABdataNew[0]) + "_" + str(ABdataNew[2]).format(7) + ".csv"))
                     if(os.path.exists(ABfilename)):
-                        insert_csvfile(ABfilename, ([end_time]+ABdataNew))
+                        insert_csvfile(ABfilename, [[end_time]+ABdataNew])
                     else:
                         write_csvfile(ABfilename, ABdata_title, ([[end_time]+ABdataNew]))
                 return True
@@ -1488,9 +1481,9 @@ def ABCom_Model_Select():
         for filename in os.listdir(ABdata_path):
             _, ABdata_list = read_csvfile(os.path.join(ABdata_path, filename))
             stockinfo = filename.split(".")[0]
-            stockBinfo = (str(ABdata_list[-1][8])+"_"+str(ABdata_list[-1][7]).format(6))
+            stockBinfo = (str(ABdata_list[0][8])+"_"+str(ABdata_list[0][7]).format(6))
             ABComCounter = 0
-            for ii in reversed(range(len(ABdata_list))):
+            for ii in range(len(ABdata_list)):
                 if(float(ABdata_list[ii][5])<float(ABdata_list[ii][10])):
                     ABComCounter += 1
                 else:
@@ -1596,14 +1589,14 @@ def get_MonthData(stockdata_list):
 def dropMonth_Model_Select():
 # 月连续跌幅
     resultfile_path = os.path.join(resultdata_path, "dropMonth_Model_Select_Result.csv")
-    title = ["股票名称", "当月涨跌幅", "连续跌幅月数", "月累计总跌幅"]
+    title = ["股票名称", "当月涨跌幅", "连续跌幅月数", "月累计总跌幅", "最多连续跌幅月数", "最大月连续跌幅"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         resultdata_list.append(dropMonth_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
 def dropMonth_Model_Select_par():
     resultfile_path = os.path.join(resultdata_path, "dropMonth_Model_Select_Result.csv")
-    title = ["股票名称", "当月涨跌幅", "连续跌幅月数", "月累计总跌幅"]
+    title = ["股票名称", "当月涨跌幅", "连续跌幅月数", "月累计总跌幅", "最多连续跌幅月数", "最大月连续跌幅"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(dropMonth_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -1624,7 +1617,21 @@ def dropMonth_Model_Select_pipeline(filename):
             break
     if(monthdropcounter>0):
         monthdroprange = (monthclosingprice_list[1]-monthclosingprice_list[monthdropcounter+1])/monthclosingprice_list[monthdropcounter+1]*100
-        return [stockinfo, month_range, monthdropcounter, monthdroprange]
+        maxdropcounter = 0
+        maxdroprange = 0
+        for ii in range(monthdropcounter, len(monthclosingprice_list)):
+            tempdropcounter = 0
+            for jj in range(ii, len(monthclosingprice_list)-1):
+                if(monthclosingprice_list[jj]<=monthclosingprice_list[jj+1]):
+                    tempdropcounter += 1
+                else:
+                    tempdroprange = (monthclosingprice_list[ii]-monthclosingprice_list[ii+tempdropcounter])/monthclosingprice_list[ii+tempdropcounter]*100
+                    if(tempdroprange<maxdroprange):
+                        maxdroprange = tempdroprange
+                    if(tempdropcounter>maxdropcounter):
+                        maxdropcounter = tempdropcounter
+                    break
+        return [stockinfo, month_range, monthdropcounter, monthdroprange, maxdropcounter, maxdroprange]
     else:
         return []
 
@@ -1679,11 +1686,11 @@ def KDJMonth_Model_Select_pipeline(filename):
             else:
                 break
         KDJ_range = (monthclosingprice_list[0]-monthclosingprice_list[KDJ_counter-1])/monthclosingprice_list[KDJ_counter-1]*100
-        KDJ_predict = round(KDJ_list[-1]/(KDJ_list[-2]-KDJ_list[-1]), 2)
-        K_price = round((H9-L9)*K_list[-1]/100+L9, 2)
+        KDJ_predict = KDJ_list[-1]/(KDJ_list[-2]-KDJ_list[-1])
+        K_price = (H9-L9)*K_list[-1]/100+L9
         KDJ_slope = ((K_list[-1]-D_list[-1])-(K_list[-2]-D_list[-2]))/((K_list[-1]+D_list[-1])/2)
         month_range = (monthclosingprice_list[0]-monthclosingprice_list[1])/monthclosingprice_list[1]*100
-        return [stockinfo, month_range, KDJ_predict, KDJ_counter, KDJ_range, monthclosingprice_list[0], K_price, KDJ_slope, K_list[-1], D_list[-1], J_list[-1], RSV]
+        return [stockinfo, month_range, round(KDJ_predict,2), KDJ_counter, KDJ_range, monthclosingprice_list[0], round(K_price,2), KDJ_slope, K_list[-1], D_list[-1], J_list[-1], RSV]
     else:
         return []
 
@@ -1691,9 +1698,9 @@ def KDJMonth_Model_Select_pipeline(filename):
 def MACDDIFFMonth_Model_Select():
 # MACD 模型 (12,26,9)
     resultfile_path1 = os.path.join(resultdata_path, "MACDMonth_Model_Select_Result.csv")
-    title1 = ["股票名称", "当月涨跌幅", "估算MACD贯穿月数", "MACD下方月数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格", "MACD不变预测价格"]
     resultfile_path2 = os.path.join(resultdata_path, "DIFFMonth_Model_Select_Result.csv")
-    title2 = ["股票名称", "当月涨跌幅", "估算DIFF贯穿月数", "DIFF下方月数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF不变预测价格"]
+    title1 = ["股票名称", "当月涨跌幅", "估算MACD贯穿月数", "MACD下方月数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格", "MACD平行预测价格", "MACD不变预测价格"]
+    title2 = ["股票名称", "当月涨跌幅", "估算DIFF贯穿月数", "DIFF下方月数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF平行预测价格", "DIFF不变预测价格"]
     resultdata_list1 = []
     resultdata_list2 = []
     for filename in os.listdir(stockdata_path):
@@ -1704,9 +1711,9 @@ def MACDDIFFMonth_Model_Select():
     write_csvfile(resultfile_path2, title2, resultdata_list2)
 def MACDDIFFMonth_Model_Select_par():
     resultfile_path1 = os.path.join(resultdata_path, "MACDMonth_Model_Select_Result.csv")
-    title1 = ["股票名称", "当月涨跌幅", "估算MACD贯穿月数", "MACD下方月数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格", "MACD不变预测价格"]
     resultfile_path2 = os.path.join(resultdata_path, "DIFFMonth_Model_Select_Result.csv")
-    title2 = ["股票名称", "当月涨跌幅", "估算DIFF贯穿月数", "DIFF下方月数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF不变预测价格"]
+    title1 = ["股票名称", "当月涨跌幅", "估算MACD贯穿月数", "MACD下方月数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格", "MACD平行预测价格", "MACD不变预测价格"]
+    title2 = ["股票名称", "当月涨跌幅", "估算DIFF贯穿月数", "DIFF下方月数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF平行预测价格", "DIFF不变预测价格"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(MACDDIFFMonth_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -1743,13 +1750,14 @@ def MACDDIFFMonth_Model_Select_pipeline(filename):
             else:
                 break
         MACD_range = (monthclosingprice_list[0]-monthclosingprice_list[MACD_counter-1])/monthclosingprice_list[MACD_counter-1]*100
-        MACD_predict = round(MACD_list[-1]/(MACD_list[-2]-MACD_list[-1]), 2)
-        cross_price = round((DEA9_list[-1]-11/13*EMA12+25/27*EMA26)/(2/13-2/27), 2)
-        parallel_price = round((5/8*MACD+DEA9_list[-1]-11/13*EMA12+25/27*EMA26)/(2/13-2/27), 2)
+        MACD_predict = MACD_list[-1]/(MACD_list[-2]-MACD_list[-1])
+        cross_price = (DEA9_list[-1]-11/13*EMA12+25/27*EMA26)/(2/13-2/27)
+        slope_price = (5/8*(MACD_list[-1]*2-MACD_list[-2])+DEA9_list[-1]-11/13*EMA12+25/27*EMA26)/(2/13-2/27)
+        parallel_price = (5/8*MACD+DEA9_list[-1]-11/13*EMA12+25/27*EMA26)/(2/13-2/27)
         MACD_slope = (MACD_list[-1]-MACD_list[-2])/monthclosingprice_list[0]
         month_range = (monthclosingprice_list[0]-monthclosingprice_list[1])/monthclosingprice_list[1]*100
         DEA_ratio = DEA9_list[-1]/monthclosingprice_list[0]
-        MACD_result = [stockinfo, month_range, MACD_predict, MACD_counter, DEA_ratio, MACD_range, MACD_slope, monthclosingprice_list[0], cross_price, parallel_price]
+        MACD_result = [stockinfo, month_range, round(MACD_predict,2), MACD_counter, DEA_ratio, MACD_range, MACD_slope, monthclosingprice_list[0], round(cross_price,2), round(slope_price,2), round(parallel_price,2)]
     if((DIFF_list[-2]<0) and (DIFF_list[-1]>DIFF_list[-2])):
         DIFF_counter = 1
         for ii in reversed(range(len(DIFF_list)-1)):
@@ -1759,11 +1767,13 @@ def MACDDIFFMonth_Model_Select_pipeline(filename):
                 break
         DIFF_predict = DIFF_list[-1]/(DIFF_list[-2]-DIFF_list[-1])
         cross_price = (25/27*EMA26-11/13*EMA12)/(2/13-2/27)
+        slope_price = (2*DIFF_list[-1]-DIFF_list[-2]+25/27*EMA26-11/13*EMA12)/(2/13-2/27)
         parallel_price = (DIFF_list[-1]+25/27*EMA26-11/13*EMA12)/(2/13-2/27)
         DIFF_slope = (DIFF_list[-1]-DIFF_list[-2])/monthclosingprice_list[0]
+        month_range = (monthclosingprice_list[0]-monthclosingprice_list[1])/monthclosingprice_list[1]*100
         DEA_ratio = DEA9_list[-1]/monthclosingprice_list[0]
         DIFF_ratio = DIFF_list[-1]/DEA9_list[-1]
-        DIFF_result = [stockinfo, monthclosingprice_list[0], round(DIFF_predict,2), DIFF_counter, round(DIFF_ratio,2), DEA_ratio, DIFF_slope, monthclosingprice_list[0], round(cross_price,2), round(parallel_price,2)]
+        DIFF_result = [stockinfo, month_range, round(DIFF_predict,2), DIFF_counter, round(DIFF_ratio,2), DEA_ratio, DIFF_slope, monthclosingprice_list[0], round(cross_price,2), round(slope_price,2), round(parallel_price,2)]
     return MACD_result, DIFF_result
 
 
@@ -1804,11 +1814,11 @@ def trendMonth_Model_Select_pipeline(filename):
             else:
                 break
         trend_range = (monthclosingprice_list[0]-monthclosingprice_list[trend_counter])/monthclosingprice_list[trend_counter]*100
-        trend_predict = round(DIFF_list[0]/(DIFF_list[1]-DIFF_list[0]), 2)
-        cross_price = round(sum(monthclosingprice_list[:4])/4, 2)
-        parallel_price = round((DIFF_list[0]*5/4+cross_price), 2)
+        trend_predict = DIFF_list[0]/(DIFF_list[1]-DIFF_list[0])
+        cross_price = sum(monthclosingprice_list[:4])/4
+        parallel_price = DIFF_list[0]*5/4+cross_price
         month_range = (monthclosingprice_list[0]-monthclosingprice_list[1])/monthclosingprice_list[1]*100
-        return [stockinfo, month_range, trend_predict, trend_counter, trend_range, monthclosingprice_list[0], cross_price, parallel_price]
+        return [stockinfo, month_range, round(trend_predict,2), trend_counter, trend_range, monthclosingprice_list[0], round(cross_price,2), round(parallel_price,2)]
     else:
         return []
 
@@ -1850,11 +1860,11 @@ def trendMonth5_Model_Select_pipeline(filename):
             else:
                 break
         trend_range = (monthclosingprice_list[0]-monthclosingprice_list[trend_counter])/monthclosingprice_list[trend_counter]*100
-        trend_predict = round(DIFF_list[0]/(DIFF_list[1]-DIFF_list[0]), 2)
+        trend_predict = DIFF_list[0]/(DIFF_list[1]-DIFF_list[0])
         cross_price = sum(monthclosingprice_list[:9])-2*sum(monthclosingprice_list[:4])
         parallel_price = 10*DIFF_list[0]+cross_price
         month_range = (monthclosingprice_list[0]-monthclosingprice_list[1])/monthclosingprice_list[1]*100
-        return [stockinfo, month_range, trend_predict, trend_counter, trend_range, monthclosingprice_list[0], cross_price, parallel_price]
+        return [stockinfo, month_range, round(trend_predict,2), trend_counter, trend_range, monthclosingprice_list[0], round(cross_price,2), round(parallel_price,2)]
     else:
         return []
 

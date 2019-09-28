@@ -90,7 +90,7 @@ def morningfall_select():
         cylinder_range = (float(item[3])-float(item[4]))/float(item[7])*100
         downshadow_range = (min(float(item[4]), float(item[3]))-float(item[6]))/float(item[7])*100
         upshadow_range = (float(item[5])-max(float(item[4]), float(item[3])))/float(item[7])*100
-        if(cylinder_range<-3):
+        if((cylinder_range<-3) and (open_range<0)):
             earnratio = "-1"
             reboundrange = "-1"
             for EHBFitem in EHBFdata_list:
@@ -123,7 +123,7 @@ def afternoonfall_select():
         cylinder_range = (float(nightitem[3])-float(nightitem[4]))/float(nightitem[7])*100
         downshadow_range = (min(float(nightitem[4]), float(nightitem[3]))-float(nightitem[6]))/float(nightitem[7])*100
         upshadow_range = (float(nightitem[5])-max(float(nightitem[4]), float(nightitem[3])))/float(nightitem[7])*100
-        if(afternoon_range<-3):
+        if((afternoon_range<-3) and (open_range<0) and (noon_range<0)):
             earnratio = "-1"
             reboundrange = "-1"
             for EHBFitem in EHBFdata_list:
@@ -147,7 +147,7 @@ def alldayfall_select():
         cylinder_range = (float(nightitem[3])-float(nightitem[4]))/float(nightitem[7])*100
         downshadow_range = (min(float(nightitem[4]), float(nightitem[3]))-float(nightitem[6]))/float(nightitem[7])*100
         upshadow_range = (float(nightitem[5])-max(float(nightitem[4]), float(nightitem[3])))/float(nightitem[7])*100
-        if(cylinder_range<-4):
+        if((cylinder_range<-4) and (open_range<0)):
             earnratio = "-1"
             reboundrange = "-1"
             for EHBFitem in EHBFdata_list:
