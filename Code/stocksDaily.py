@@ -54,6 +54,14 @@ def write_csvfile(filename, title, data_list):
                 fp.write(",".join([str(item) for item in row_item]) + "\n")
 
 
+def isMarketOpen():
+    df = tspro.trade_cal(exchange='', start_date=day_time, end_date=day_time)
+    df_list = df.values.tolist()
+    if(df_list[0][2]==1):
+        return True
+    else:
+        return False
+
 def get_realtimedata(filename):
     title = ["code", "name", "changepercent", "trade", "open", "high", "low", "settlement", "volumn", "turnoverratio", "amount", "per", "pb", "mktcap", "nmc"]
     for ii in range(5):
@@ -159,13 +167,14 @@ def alldayfall_select():
         write_csvfile(resultfile_path, title, resultdata_list)
 
 if(__name__ == "__main__"):
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMorningfall_Select Begin!")
-    morningfall_select()
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMorningfall_Select Finished!")
-    time.sleep(5*3600)
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tafternoonfall_Select Begin!")
-    afternoonfall_select()
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tafternoonfall_Select Finished!")
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\talldayfall_Select Begin!")
-    alldayfall_select()
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\talldayfall_Select Finished!")
+    if(isMarketOpen()):
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMorningfall_Select Begin!")
+        morningfall_select()
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMorningfall_Select Finished!")
+        time.sleep(5*3600)
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tafternoonfall_Select Begin!")
+        afternoonfall_select()
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tafternoonfall_Select Finished!")
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\talldayfall_Select Begin!")
+        alldayfall_select()
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\talldayfall_Select Finished!")
