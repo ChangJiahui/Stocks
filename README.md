@@ -26,7 +26,10 @@
 	+ stock_gdzjc
 		+ (stockinfo).csv
 	+ （中证规模指数）.xls
+	+ fund_data
+		+ (fundinfo).csv
 	+ stockinfo.txt
+	+ fundinfo.txt
 + Daily：每日股票实盘分析
 	+ yyyymmdd
 		+ *_select.csv
@@ -38,7 +41,9 @@
 	+ stocksBackTest.py （股票量化模型回测）
 	+ stocksDaily.py （分时运行股票量化分析）
 	+ stocksRealtime.py （每日实时监控大盘）
+	+ fundsAnalyze.py (每日运行基金量化分析)
 
 ## 自动运行 bat：
-- Stocks_Shell.bat：运行每日分析程序 stocksAnalyze.py
-- StocksNoon_Shell.bat： 运行分时分析程序 stocksDaily.py
+- Stocks_Shell.bat： 运行每日股票分析程序 stocksAnalyze.py
+- StocksNoon_Shell.bat： 运行股票分时分析程序 stocksDaily.py
+- Funds_Shell.bat： 运行每日基金分析程序 fundsAnalyze.py
