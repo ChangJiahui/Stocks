@@ -28,14 +28,25 @@
 	+ （中证规模指数）.xls
 	+ fund_data
 		+ (fundinfo).csv
+	+ daily_data
+		+ (yyyymmdd)
+			+ noon_data.csv
+			+ night_data.csv
 	+ stockinfo.txt
 	+ fundinfo.txt
 + Daily：每日股票实盘分析
 	+ yyyymmdd
 		+ *_select.csv
 + Result：量化模型分析结果
-	+ yyyymmdd
-		+ *_select.csv
+	+ Stocks
+		+ yyyymmdd
+			+ *_select.csv
+	+ Daily
+		+ yyyymmdd
+			+ *_select.csv
+	+ Funds
+		+ yyyymmdd
+			+ *_select.csv
 + Code：运行及测试代码
 	+ stocksAnalyze.py (每日运行股票量化分析)
 	+ stocksBackTest.py （股票量化模型回测）
@@ -44,6 +55,5 @@
 	+ fundsAnalyze.py (每日运行基金量化分析)
 
 ## 自动运行 bat：
-- Stocks_Shell.bat： 运行每日股票分析程序 stocksAnalyze.py
+- Stocks_Shell.bat： 运行每日股票基金分析程序 stocksAnalyze.py
 - StocksNoon_Shell.bat： 运行股票分时分析程序 stocksDaily.py
-- Funds_Shell.bat： 运行每日基金分析程序 fundsAnalyze.py

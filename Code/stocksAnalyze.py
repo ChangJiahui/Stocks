@@ -30,7 +30,7 @@ stockinfo_file = os.path.join(root_path, "Data", "stockinfo.txt")
 stockdata_path = os.path.join(root_path, "Data", "stock_data")
 stockgdzjc_path = os.path.join(root_path, "Data", "stock_gdzjc")
 indexdata_path = os.path.join(root_path, "Data", "index_data")
-resultdata_path = os.path.join(root_path, "Result", end_time)
+resultdata_path = os.path.join(root_path, "Result", "Stocks", end_time)
 if __name__=="__main__":
     if(not os.path.exists(resultdata_path)):
         os.mkdir(resultdata_path)
@@ -408,14 +408,14 @@ def EHBF_Analyze_pipeline(filename):
 def drop_Model_Select():
 # 连续多日跌幅模型
     resultfile_path = os.path.join(resultdata_path, "drop_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "连续跌幅天数", "日累计总跌幅", "收盘价连续最低天数", "最低价连续最低天数", "百日最多跌幅天数", "百日最大连续跌幅"]
+    title = ["股票名称", "当日涨跌幅", "连续跌幅天数", "日累计总跌幅", "放量倍数", "百日位置(%)", "收盘价连续最低天数", "最低价连续最低天数", "百日最多跌幅天数", "百日最大连续跌幅"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         resultdata_list.append(drop_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
 def drop_Model_Select_par():
     resultfile_path = os.path.join(resultdata_path, "drop_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "连续跌幅天数", "日累计总跌幅", "收盘价连续最低天数", "最低价连续最低天数", "百日最多跌幅天数", "百日最大连续跌幅"]
+    title = ["股票名称", "当日涨跌幅", "连续跌幅天数", "日累计总跌幅", "放量倍数", "百日位置(%)", "收盘价连续最低天数", "最低价连续最低天数", "百日最多跌幅天数", "百日最大连续跌幅"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(drop_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -434,6 +434,10 @@ def drop_Model_Select_pipeline(filename):
         droprange = (float(stockdata_list[0][3])-float(stockdata_list[dropcounter][3]))/float(stockdata_list[dropcounter][3])*100
         closingprice = float(stockdata_list[0][3])
         leastprice = float(stockdata_list[0][5])
+        volumnratio = float(stockdata_list[0][10])/float(stockdata_list[1][10])
+        maxprice = max([float(item[3]) for item in stockdata_list[:100]])
+        minprice = min([float(item[3]) for item in stockdata_list[:100]])
+        reboundrange = (closingprice-minprice)/(maxprice-minprice)*100
         closingcounter = 0
         leastcounter = 0
         for ii in range(1, len(stockdata_list)):
@@ -460,7 +464,7 @@ def drop_Model_Select_pipeline(filename):
                     if(tempdropcounter>maxdropcounter):
                         maxdropcounter = tempdropcounter
                     break
-        return [stockinfo, stockdata_list[0][9], dropcounter, droprange, closingcounter, leastcounter, maxdropcounter, maxdroprange]
+        return [stockinfo, stockdata_list[0][9], dropcounter, droprange, volumnratio, reboundrange, closingcounter, leastcounter, maxdropcounter, maxdroprange]
     else:
         return []
 
@@ -468,14 +472,14 @@ def drop_Model_Select_pipeline(filename):
 def rise_Model_Select():
 # 连续多日上涨(&阳线)模型
     resultfile_path = os.path.join(resultdata_path, "rise_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "连续上涨天数",  "日累计总涨幅", "放量倍数", "百日位置(%)"]
+    title = ["股票名称", "当日涨跌幅", "连续上涨天数",  "日累计总涨幅", "放量倍数", "百日位置(%)", "收盘价连续最高天数", "最高价连续最高天数", "百日最多涨幅天数", "百日最大连续涨幅"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         resultdata_list.append(rise_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
 def rise_Model_Select_par():
     resultfile_path = os.path.join(resultdata_path, "rise_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "连续上涨天数", "日累计总涨幅", "放量倍数", "百日位置(%)"]
+    title = ["股票名称", "当日涨跌幅", "连续上涨天数",  "日累计总涨幅", "放量倍数", "百日位置(%)", "收盘价连续最高天数", "最高价连续最高天数", "百日最多涨幅天数", "百日最大连续涨幅"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(rise_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -492,14 +496,41 @@ def rise_Model_Select_pipeline(filename):
             risecounter += 1
         else:
             break
-    maxprice = max([float(item[3]) for item in stockdata_list[:100]])
-    minprice = min([float(item[3]) for item in stockdata_list[:100]])
-    closingprice = float(stockdata_list[0][3])
-    reboundrange = (closingprice-minprice)/(maxprice-minprice)*100
-    if((risecounter>=3) and (reboundrange<50)):
+    if(risecounter>0):
         riserange = (float(stockdata_list[0][3])-float(stockdata_list[risecounter][3]))/float(stockdata_list[risecounter][3])*100
+        closingprice = float(stockdata_list[0][3])
+        topprice = float(stockdata_list[0][4])
+        maxprice = max([float(item[3]) for item in stockdata_list[:100]])
+        minprice = min([float(item[3]) for item in stockdata_list[:100]])
+        reboundrange = (closingprice-minprice)/(maxprice-minprice)*100
         volumnratio = float(stockdata_list[0][10])/float(stockdata_list[1][10])
-        return [stockinfo, stockdata_list[0][9], risecounter, riserange, volumnratio, reboundrange]
+        closingcounter = 0
+        topcounter = 0
+        for ii in range(1, len(stockdata_list)):
+            if(topprice>float(stockdata_list[ii][3])):
+                topcounter += 1
+            else:
+                break
+        for ii in range(1, len(stockdata_list)):
+            if(closingprice>float(stockdata_list[ii][3])):
+                closingcounter += 1
+            else:
+                break
+        maxrisecounter = 0
+        maxriserange = 0
+        for ii in range(risecounter, min(100,len(stockdata_list))):
+            temprisecounter = 0
+            for jj in range(ii, len(stockdata_list)-1):
+                if(float(stockdata_list[jj][9])>0):
+                    temprisecounter += 1
+                else:
+                    tempriserange = (float(stockdata_list[ii][3])-float(stockdata_list[ii+temprisecounter][3]))/float(stockdata_list[ii+temprisecounter][3])*100
+                    if(tempriserange>maxriserange):
+                        maxriserange = tempriserange
+                    if(temprisecounter>maxrisecounter):
+                        maxrisecounter = temprisecounter
+                    break
+        return [stockinfo, stockdata_list[0][9], risecounter, riserange, volumnratio, reboundrange, closingcounter, topcounter, maxrisecounter, maxriserange]
     else:
         return []
 

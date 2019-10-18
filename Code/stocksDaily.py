@@ -18,11 +18,11 @@ day_time = time.strftime('%Y%m%d', time.localtime(time.time()))
 yesterday_time = time.strftime('%Y%m%d', time.localtime(time.time()-3600*24))
 
 root_path = "D:\\Workspace\\Python\\Stocks"
-resultdata_path = os.path.join(root_path, "Daily", day_time)
-analyzedata_path = os.path.join(root_path, "Result", yesterday_time)
+resultdata_path = os.path.join(root_path, "Result", "Daily", day_time)
+analyzedata_path = os.path.join(root_path, "Result", "Stocks", yesterday_time)
 
-noondata_path = os.path.join(resultdata_path, "noon_data.csv")
-nightdata_path = os.path.join(resultdata_path, "night_data.csv")
+noondata_path = os.path.join(root_path, 'Data', 'daily_data', "noon_data.csv")
+nightdata_path = os.path.join(root_path, 'Data', 'daily_data', "night_data.csv")
 if(not os.path.exists(resultdata_path)):
     os.mkdir(resultdata_path)
 
@@ -166,7 +166,8 @@ def alldayfall_select():
     if(resultdata_list):
         write_csvfile(resultfile_path, title, resultdata_list)
 
-if(__name__ == "__main__"):
+
+def main():
     if(isMarketOpen()):
         print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMorningfall_Select Begin!")
         morningfall_select()
@@ -178,3 +179,7 @@ if(__name__ == "__main__"):
         print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\talldayfall_Select Begin!")
         alldayfall_select()
         print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\talldayfall_Select Finished!")
+
+
+if(__name__ == "__main__"):
+    main()

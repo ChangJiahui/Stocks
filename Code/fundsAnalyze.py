@@ -1,24 +1,28 @@
 import os
 import time
 import random
+import tunet
 import requests
 import urllib
 import re
 import multiprocessing
 import csv
 import math
+import tushare as ts
 
+
+tspro = ts.pro_api("119921ff45f95fd77e5d149cd1e64e78572712b3d0a5ce38157f255b")
 
 headers = {'user-agent':'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.26 Safari/537.36 Core/1.63.6788.400 QQBrowser/10.3.2888.400'}
 
-start_time = "1990-01-01"
-end_time = time.strftime('%Y-%m-%d',time.localtime(time.time()))
-#end_time = "2019-06-21"
+start_time = "19900101"
+end_time = time.strftime('%Y%m%d',time.localtime(time.time()))
+#end_time = "20190621"
 
 root_path = "D:\\Workspace\\Python\\Stocks"
 fundinfo_file = os.path.join(root_path, "Data", "fundinfo.txt")
 funddata_path = os.path.join(root_path, "Data", "fund_data")
-resultdata_path = os.path.join(root_path, "Result", end_time)
+resultdata_path = os.path.join(root_path, "Result", "Funds", end_time)
 if __name__=="__main__":
     if(not os.path.exists(resultdata_path)):
         os.mkdir(resultdata_path)
@@ -80,7 +84,7 @@ def get_htmltext(url):
 def get_hexundata(fundinfo):
     fundtype=fundinfo.split('_')[0]
     fundcode=fundinfo.split('_')[1]
-    hexundata_url = "http://data.funds.hexun.com/outxml/detail/openfundnetvalue.aspx?fundcode={}&startdate={}&enddate={}".format(fundcode, start_time, end_time)
+    hexundata_url = "http://data.funds.hexun.com/outxml/detail/openfundnetvalue.aspx?fundcode={}&startdate={}&enddate={}".format(fundcode, (start_time[0:4]+'-'+start_time[4:6]+'-'+start_time[6:8]), (end_time[0:4]+'-'+end_time[4:6]+'-'+end_time[6:8]))
     hexundata_html = get_htmltext(hexundata_url)
     if(hexundata_html!=""):
         fundcode = re.findall(r'<fundcode>(.*)</fundcode>', hexundata_html)[0]
@@ -94,16 +98,28 @@ def get_hexundata(fundinfo):
 #            title = ['时间', '基金信息', '单位净值', '累计净值', '上证指数']
 #            funddata_list = [[fundinfo, enddate_list[ii], unitnetvalue_list[ii], netvalue_list[ii], newprice_list[ii]] for ii in range(len(enddate_list))]
             title = ['时间', '基金信息', '单位净值', '累计净值']
-            fundinfo = fundtype+'_'fundcode+'_'+fundname
+            fundinfo = fundtype+'_'+fundcode+'_'+fundname
             funddata_file = os.path.join(funddata_path,'{}.csv'.format(fundinfo))
             funddata_list = [[enddate_list[ii], fundinfo, unitnetvalue_list[ii], netvalue_list[ii]] for ii in range(len(enddate_list))]
             write_csvfile(funddata_file, title, funddata_list)
+            check_funddata(funddata_file)
 
 
 def get_funddata():
     with open(fundinfo_file, 'r') as fp:
         for fundinfo in fp.readlines():
             get_hexundata(fundinfo.strip())
+
+
+def check_funddata(filename):
+    title, funddata_list = read_csvfile(filename)
+    for ii in reversed(range(len(funddata_list))):
+        if((funddata_list[ii][3]=="") or (funddata_list[ii][3]=="0.0000")):
+            funddata_list.pop(ii)
+    if(funddata_list==[]):
+        os.remove(filename)
+    else:
+        write_csvfile(filename, title, funddata_list)
 
 
 def get_fundinfo():
@@ -124,6 +140,15 @@ def get_fundinfo():
     with open(fundinfo_file, 'w') as fp:
         fp.write("\n".join(fundinfo_list))
     return True
+
+
+def isMarketOpen():
+    df = tspro.trade_cal(exchange='', start_date=end_time, end_date=end_time)
+    df_list = df.values.tolist()
+    if(df_list[0][2]==1):
+        return True
+    else:
+        return False
 
 
 def MACDDIFF_Model_Select():
@@ -222,15 +247,16 @@ def main():
     tunet_connect()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tNet Connect Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tData Prepare Begin!")
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tClear Fund Data Begin!")
-    clear_data()
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tClear Fund Data Finished!")
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tGenerage Fund Info Begin!")
-    get_fundinfo()
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tGenerage Fund Info Finished!")
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tFund Data Download Begin!")
-    get_funddata()
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tFund Data Download Finished!")
+    if(isMarketOpen()):
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tClear Fund Data Begin!")
+        clear_data()
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tClear Fund Data Finished!")
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tGenerage Fund Info Begin!")
+        get_fundinfo()
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tGenerage Fund Info Finished!")
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tFund Data Download Begin!")
+        get_funddata()
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tFund Data Download Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tData Prepare Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tData Analyze Begin!")
     analyze_funddata()
