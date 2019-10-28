@@ -16,7 +16,7 @@ tspro = ts.pro_api("119921ff45f95fd77e5d149cd1e64e78572712b3d0a5ce38157f255b")
 headers = {'user-agent':'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.26 Safari/537.36 Core/1.63.6788.400 QQBrowser/10.3.2888.400'}
 
 start_time = "19900101"
-end_time = time.strftime('%Y%m%d',time.localtime(time.time()))
+end_time = time.strftime('%Y%m%d',time.localtime(time.time()-24*3600))
 #end_time = "20190621"
 
 root_path = "D:\\Workspace\\Python\\Stocks"

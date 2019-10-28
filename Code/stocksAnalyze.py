@@ -17,6 +17,7 @@ import xlrd
 import multiprocessing
 import tunet
 import urllib
+from scipy.stats import pearsonr
 
 
 tspro = ts.pro_api("119921ff45f95fd77e5d149cd1e64e78572712b3d0a5ce38157f255b")
@@ -1278,18 +1279,6 @@ def similar_Model_Select_par():
     pool.join()
     write_csvfile(resultfile_path, title, resultdata_list)
 def similar_Model_Select_pipeline(filename):
-    def pearson_r(a, b):
-        if(len(a)==len(b)):
-            dims = len(a)
-            denominator = (sum([ii**2 for ii in a])-sum(a)**2/dims)*(sum([ii**2 for ii in b])-sum(b)**2/dims)
-#            denominator = (sum(np.multiply(np.array(a),np.array(a)))-sum(a)**2/dims)*(sum(np.multiply(np.array(b),np.array(b)))-sum(b)**2/dims)
-            if(denominator<=0):
-                return 0
-            else:
-                return (sum([a[ii]*b[ii] for ii in range(dims)])-sum(a)*sum(b)/dims)/math.sqrt(denominator)
-#                return (sum(np.multiply(np.array(a),np.array(b)))-sum(a)*sum(b)/dims)/math.sqrt(denominator)
-        else:
-            return 0
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     selfsimidate = ""
@@ -1301,7 +1290,7 @@ def similar_Model_Select_pipeline(filename):
     selfprerange_list = [0, 0, 0, 0, 0]
     for ii in range(75, min(125, len(stockdata_list)-30)):
         closingprice_list = [float(item[3]) for item in stockdata_list[ii:(ii+30)]]
-        simidegree = pearson_r(closingprice_list,ref_list)
+        simidegree, _ = pearsonr(closingprice_list,ref_list)
         if(simidegree>maxselfsimidegree):
             maxselfsimidegree = simidegree
             selfsimidate = stockdata_list[ii][0]
@@ -2117,6 +2106,8 @@ def main():
         print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tStock Data Download Begin!")
         get_stockdata()
         print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tStock Data Download Finished!")
+    else:
+        time.sleep(1800)
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tData Prepare Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tData Analyze Begin!")
     analyze_stockdata()
