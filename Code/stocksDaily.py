@@ -15,16 +15,16 @@ Noon_Begin = "11:30:00"
 Noon_End = "13:00:00"
 Closing_Time = "15:00:00"
 day_time = time.strftime('%Y%m%d', time.localtime(time.time()))
-yesterday_time = time.strftime('%Y%m%d', time.localtime(time.time()-3600*24))
 
 root_path = "D:\\Workspace\\Python\\Stocks"
-resultdata_path = os.path.join(root_path, "Result", "Daily", day_time)
-analyzedata_path = os.path.join(root_path, "Result", "Stocks", yesterday_time)
-
-noondata_path = os.path.join(root_path, 'Data', 'daily_data', "noon_data.csv")
-nightdata_path = os.path.join(root_path, 'Data', 'daily_data', "night_data.csv")
-if(not os.path.exists(resultdata_path)):
-    os.mkdir(resultdata_path)
+EHBFfile_path = os.path.join(root_path, "Result", "Stocks", "EHBF_Analyze_Result.csv")
+dailydata_path = os.path.join(root_path, 'Data', 'daily_data') 
+noondata_path = os.path.join(dailydata_path, "noon_data.csv")
+nightdata_path = os.path.join(dailydata_path, "night_data.csv")
+resultdata_path = os.path.join(root_path, "Result", "Daily")
+if __name__=="__main__":
+    if(not os.path.exists(resultdata_path)):
+        os.mkdir(resultdata_path)
 
 
 def timesub(time1, time2):
@@ -52,6 +52,24 @@ def write_csvfile(filename, title, data_list):
         for row_item in data_list:
             if(row_item!=[]):
                 fp.write(",".join([str(item) for item in row_item]) + "\n")
+
+
+def gen_tscode(stockcode):
+    code = ""
+    if(stockcode[0]=="0"):
+        code=stockcode+".SZ"
+    elif(stockcode[0]=="6"):
+        code=stockcode+".SH"
+    return code
+
+
+def gen_163code(stockcode):
+    code = ""
+    if(stockcode[0]=="0"):
+        code = "1"+stockcode
+    elif(stockcode[0]=="6"):
+        code = "0"+stockcode
+    return code
 
 
 def isMarketOpen():
@@ -87,7 +105,6 @@ def get_realtimedata(filename):
 
 def morningfall_select():
     resultfile_path = os.path.join(resultdata_path, "morningfall_select.csv")
-    EHBFfile_path = os.path.join(analyzedata_path, "EHBF_Analyze_Result.csv")
     get_realtimedata(noondata_path)
     title = ["股票名称", "当前涨跌幅", "获利持仓比例", "百日位置(%)", "开盘涨跌幅", "柱线幅度", "下影线幅度", "上影线幅度"]
     resultdata_list = []
@@ -112,7 +129,6 @@ def morningfall_select():
 
 def afternoonfall_select():
     resultfile_path = os.path.join(resultdata_path, "afternoonfall_select.csv")
-    EHBFfile_path = os.path.join(analyzedata_path, "EHBF_Analyze_Result.csv")
     get_realtimedata(nightdata_path)
     title = ["股票名称", "今日涨跌幅", "获利持仓比例", "百日位置(%)", "上午涨跌幅", "午后涨跌幅", "开盘涨跌幅", "柱线幅度", "下影线幅度", "上影线幅度"]
     resultdata_list = []
@@ -145,7 +161,6 @@ def afternoonfall_select():
 
 def alldayfall_select():
     resultfile_path = os.path.join(resultdata_path, "alldayfall_select.csv")
-    EHBFfile_path = os.path.join(analyzedata_path, "EHBF_Analyze_Result.csv")
     title = ["股票名称", "今日涨跌幅", "获利持仓比例", "百日位置(%)", "开盘涨跌幅", "柱线幅度", "下影线幅度", "上影线幅度"]
     resultdata_list = []
     _, nightdata_list = read_csvfile(nightdata_path)
@@ -167,8 +182,22 @@ def alldayfall_select():
         write_csvfile(resultfile_path, title, resultdata_list)
 
 
+def clear_data():
+    for filename in os.listdir(dailydata_path):
+        filepath = os.path.join(dailydata_path, filename)
+        if(os.path.exists(filepath)):
+            os.remove(filepath)
+    for filename in os.listdir(resultdata_path):
+        filepath = os.path.join(resultdata_path, filename)
+        if(os.path.exists(filepath)):
+            os.remove(filepath)
+
+
 def main():
     if(isMarketOpen()):
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tClear Stock Data Begin!")
+        clear_data()
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tClear Stock Data Finished!")
         print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMorningfall_Select Begin!")
         morningfall_select()
         print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMorningfall_Select Finished!")

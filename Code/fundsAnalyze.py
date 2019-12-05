@@ -3,6 +3,7 @@ import time
 import random
 import tunet
 import requests
+from bs4 import BeautifulSoup
 import urllib
 import re
 import multiprocessing
@@ -22,7 +23,7 @@ end_time = time.strftime('%Y%m%d',time.localtime(time.time()-24*3600))
 root_path = "D:\\Workspace\\Python\\Stocks"
 fundinfo_file = os.path.join(root_path, "Data", "fundinfo.txt")
 funddata_path = os.path.join(root_path, "Data", "fund_data")
-resultdata_path = os.path.join(root_path, "Result", "Funds", end_time)
+resultdata_path = os.path.join(root_path, "Result", "Funds")
 if __name__=="__main__":
     if(not os.path.exists(resultdata_path)):
         os.mkdir(resultdata_path)
@@ -85,24 +86,23 @@ def get_hexundata(fundinfo):
     fundtype=fundinfo.split('_')[0]
     fundcode=fundinfo.split('_')[1]
     hexundata_url = "http://data.funds.hexun.com/outxml/detail/openfundnetvalue.aspx?fundcode={}&startdate={}&enddate={}".format(fundcode, (start_time[0:4]+'-'+start_time[4:6]+'-'+start_time[6:8]), (end_time[0:4]+'-'+end_time[4:6]+'-'+end_time[6:8]))
-    hexundata_html = get_htmltext(hexundata_url)
-    if(hexundata_html!=""):
-        fundcode = re.findall(r'<fundcode>(.*)</fundcode>', hexundata_html)[0]
-        fundname = re.findall(r'<fundname>(.*)</fundname>', hexundata_html)[0]
-        enddate_list = re.findall(r'<fld_enddate>(.*)</fld_enddate>', hexundata_html)
-        unitnetvalue_list = re.findall(r'<fld_unitnetvalue>(.*)</fld_unitnetvalue>', hexundata_html)
-        netvalue_list = re.findall(r'<fld_netvalue>(.*)</fld_netvalue>', hexundata_html)
-#        newprice_list = re.findall(r'<fld_newprice>(.*)</fld_newprice>', hexundata_html)
-#        if(len(enddate_list)==len(unitnetvalue_list)==len(netvalue_list)==len(newprice_list)):
-        if(len(enddate_list)==len(unitnetvalue_list)==len(netvalue_list)):
-#            title = ['时间', '基金信息', '单位净值', '累计净值', '上证指数']
-#            funddata_list = [[fundinfo, enddate_list[ii], unitnetvalue_list[ii], netvalue_list[ii], newprice_list[ii]] for ii in range(len(enddate_list))]
-            title = ['时间', '基金信息', '单位净值', '累计净值']
-            fundinfo = fundtype+'_'+fundcode+'_'+fundname
-            funddata_file = os.path.join(funddata_path,'{}.csv'.format(fundinfo))
-            funddata_list = [[enddate_list[ii], fundinfo, unitnetvalue_list[ii], netvalue_list[ii]] for ii in range(len(enddate_list))]
-            write_csvfile(funddata_file, title, funddata_list)
-            check_funddata(funddata_file)
+    response = get_htmltext(hexundata_url)
+    if(response!=""):
+        soup = BeautifulSoup(response, "lxml")
+        dataset = soup.find_all('dataset')[0]
+        fundcode = dataset.find_all('fundcode')[0].text
+        fundname = dataset.find_all('fundname')[0].text
+        fundinfo = fundtype+'_'+fundcode+'_'+fundname
+        title = ['时间', '基金信息', '单位净值', '累计净值']
+        funddata_file = os.path.join(funddata_path,'{}.csv'.format(fundinfo))
+        funddata_list = []
+        for item in dataset.find_all('data'):
+            enddate = item.find_all('fld_enddate')[0].text
+            unitnetvalue = item.find_all('fld_unitnetvalue')[0].text
+            netvalue = item.find_all('fld_netvalue')[0].text
+            funddata_list.append([enddate, fundinfo, unitnetvalue, netvalue])
+        write_csvfile(funddata_file, title, funddata_list)
+        check_funddata(funddata_file)
 
 
 def get_funddata():
@@ -231,6 +231,10 @@ def MACDDIFF_Model_Select_pipeline(filename):
 def clear_data():
     for filename in os.listdir(funddata_path):
         filepath = os.path.join(funddata_path, filename)
+        if(os.path.exists(filepath)):
+            os.remove(filepath)
+    for filename in os.listdir(resultdata_path):
+        filepath = os.path.join(resultdata_path, filename)
         if(os.path.exists(filepath)):
             os.remove(filepath)
 
