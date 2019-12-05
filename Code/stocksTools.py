@@ -148,7 +148,7 @@ def get_jsvar(url, varname):
 
 
 def holders_Model_Select():
-    resultfile_path = os.path.join(resultdata_path, "Holders_Analyze_Result.csv")
+    resultfile_path = os.path.join(resultdata_path, "Holders_Analyze_Select.csv")
     title = ["股票名称",  "股东人数降低季度", "当季股东人数降幅", "股东人数总降幅", "当前股东人数", "百日位置", "盈利比例"]
     resultdata_list = []
     datanum = 0
