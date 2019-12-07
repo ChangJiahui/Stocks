@@ -110,7 +110,7 @@ def get_htmltext(url):
             if(response.status_code!=200):
                 continue
             try:
-                html_text = response.content.decode('utf8')
+                html_text = response.content.decode('utf-8-sig')
             except UnicodeDecodeError as e:
                 html_text = response.content.decode('gbk')
 #                print(e)

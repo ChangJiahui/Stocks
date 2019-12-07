@@ -3,6 +3,7 @@ import time
 import random
 import tunet
 import requests
+import execjs
 from bs4 import BeautifulSoup
 import urllib
 import re
@@ -69,7 +70,7 @@ def get_htmltext(url):
             if(response.status_code!=200):
                 return ""
             try:
-                html_text = response.content.decode('utf8')
+                html_text = response.content.decode('utf-8-sig')
             except UnicodeDecodeError as e:
 #                print(e)
                 html_text = response.content.decode('gbk')
@@ -82,27 +83,74 @@ def get_htmltext(url):
     return ""
 
 
+def get_jsvar(url, varname):
+    response = get_htmltext(url)
+    if(response.find(varname)!=-1):
+        return execjs.compile(response).eval(varname)
+    else:
+        return None
+
+
 def get_hexundata(fundinfo):
-    fundtype=fundinfo.split('_')[0]
-    fundcode=fundinfo.split('_')[1]
+    title = ['时间', '基金信息', '单位净值', '累计净值', "折算净值", "日涨跌幅"]
+    fundcode=fundinfo.split('_')[-1]
     hexundata_url = "http://data.funds.hexun.com/outxml/detail/openfundnetvalue.aspx?fundcode={}&startdate={}&enddate={}".format(fundcode, (start_time[0:4]+'-'+start_time[4:6]+'-'+start_time[6:8]), (end_time[0:4]+'-'+end_time[4:6]+'-'+end_time[6:8]))
-    response = get_htmltext(hexundata_url)
-    if(response!=""):
-        soup = BeautifulSoup(response, "lxml")
-        dataset = soup.find_all('dataset')[0]
-        fundcode = dataset.find_all('fundcode')[0].text
-        fundname = dataset.find_all('fundname')[0].text
-        fundinfo = fundtype+'_'+fundcode+'_'+fundname
-        title = ['时间', '基金信息', '单位净值', '累计净值']
-        funddata_file = os.path.join(funddata_path,'{}.csv'.format(fundinfo))
+    fhsp_url = "http://fundf10.eastmoney.com/fhsp_{}.html".format(fundcode)
+    hexun_res = get_htmltext(hexundata_url)
+    fhsp_res = get_htmltext(fhsp_url)
+    if((hexun_res!="") and (fhsp_res!="")):
         funddata_list = []
+        hexun_soup = BeautifulSoup(hexun_res, "lxml")
+        dataset = hexun_soup.find_all('dataset')[0]
+        funddata_file = os.path.join(funddata_path,'{}.csv'.format(fundinfo))
         for item in dataset.find_all('data'):
             enddate = item.find_all('fld_enddate')[0].text
             unitnetvalue = item.find_all('fld_unitnetvalue')[0].text
             netvalue = item.find_all('fld_netvalue')[0].text
-            funddata_list.append([enddate, fundinfo, unitnetvalue, netvalue])
+            funddata_list.append([enddate, fundinfo, unitnetvalue, netvalue, unitnetvalue, 0])
+        fhsp_soup = BeautifulSoup(fhsp_res, 'lxml')
+        fh_table = fhsp_soup.find_all('table', attrs={'class':'w782 comm cfxq'})[0]
+        divident_list = []
+        if(len(fh_table.find_all('td'))>1):
+            for fh_tr in fh_table.find_all('tr')[1:]:
+                fh_td_list = fh_tr.find_all('td')
+                registerdate = fh_td_list[1].text
+                dividentdate = fh_td_list[2].text
+                divident = float(re.findall(r"每份派现金(\d+\.\d+)元", fh_td_list[3].text)[0])
+                divident_list.append([registerdate, dividentdate, divident, "sub"])
+        sp_table = fhsp_soup.find_all('table', attrs={'class':'w782 comm fhxq'})[0]
+        if(len(sp_table.find_all('td'))>1):
+            for sp_tr in sp_table.find_all('tr')[1:]:
+                sp_td_list = sp_tr.find_all('td')
+                dividentdate = sp_td_list[1].text
+                dividenttext = sp_td_list[3].text
+                if(dividenttext=="暂未披露"):
+                    print("暂未披露")
+                    print(fundinfo)
+                    continue
+                divident = float(re.findall(r"1:(\d+\.\d+)", dividenttext)[0])
+                divident_list.append([dividentdate, dividentdate, divident, "divided"])
+        divident_list.sort(reverse=True, key=lambda item: item[1])
+#        print(divident_list)
+        fundoffset = len(funddata_list)
+        for ii in reversed(range(len(divident_list))):
+            for jj in reversed(range(1, fundoffset)):
+                if(funddata_list[jj-1][0]>=divident_list[ii][1]):
+                    fundoffset = jj+1
+                    proportion = 1
+                    if(divident_list[ii][3]=='sub'):
+                        proportion = 1-(float(divident_list[ii][2]))/float(funddata_list[jj][4])
+                    else:
+                        proportion = 1/float(divident_list[ii][2])
+                    for kk in range(jj, len(funddata_list)):
+                        funddata_list[kk][4] = float(funddata_list[kk][4]) * proportion
+                    break
+        for ii in range(len(funddata_list)-1):
+            funddata_list[ii][5] = ((float(funddata_list[ii][4])/float(funddata_list[ii+1][4]))-1)*100
         write_csvfile(funddata_file, title, funddata_list)
         check_funddata(funddata_file)
+    else:
+        print(fundinfo)
 
 
 def get_funddata():
@@ -124,19 +172,13 @@ def check_funddata(filename):
 
 def get_fundinfo():
 # 得到场内交易fund指数基金
-#    fund_url = "http://fund.eastmoney.com/ETFN_sj.html"
-    fund_url1 = "http://fund.eastmoney.com/cnjy_jzzzl.html"
-    fund_html1 = get_htmltext(fund_url1)
-    fund_list1 = re.findall(r'<tr bgcolor="#F5FFFF" height=20 id="tr([0-9]{6})">',fund_html1)
-    fund_list1 = [("ETF_"+item) for item in fund_list1]
-    fund_url2 = "http://fund.eastmoney.com/Data/Fund_JJJZ_Data.aspx?t=1&lx=2&page=1,20000&onlySale=0"
-    fund_html2 = get_htmltext(fund_url2)
-    fund_list2 = re.findall(r'"([0-9]{6})"', fund_html2)
-    fund_list2 = [("Stock_"+item) for item in fund_list2]
-    fund_list3 = ["162411", "501018"]
-    fund_list3 = [("Self_"+item) for item in fund_list3]
-    fundinfo_list = fund_list1 + fund_list2 + fund_list3
-    fundinfo_list = list(set(fundinfo_list))
+    url = "http://fund.eastmoney.com/js/fundcode_search.js"
+    fund_list = get_jsvar(url, 'r')
+    fundinfo_list = []
+    for ii in range(len(fund_list)):
+#    ["债券型", "混合型", "货币型", "理财型", "保本型", "债券指数", "固定收益", "定开债券", "混合-FOF", "其他创新", "股票型", "分级杠杆", "ETF-场内", "QDII", "QDII-指数", "股票指数", "联接基金", "QDII-ETF"]
+        if((fund_list[ii][3] in ["股票型", "分级杠杆", "ETF-场内", "QDII", "QDII-指数", "股票指数", "联接基金", "QDII-ETF"]) and ("(后端)" not in fund_list[ii][2]) and fund_list[ii][2][-1]!='C'):
+            fundinfo_list.append(fund_list[ii][3]+'_'+fund_list[ii][2].replace('/','-')+'_'+fund_list[ii][0])
     with open(fundinfo_file, 'w') as fp:
         fp.write("\n".join(fundinfo_list))
     return True
@@ -187,8 +229,8 @@ def MACDDIFF_Model_Select_pipeline(filename):
     MACD_result = []
     DIFF_result = []
     for ii in reversed(range(min(200, len(funddata_list)))):
-        EMA12 = 11/13*EMA12 + 2/13*float(funddata_list[ii][3])
-        EMA26 = 25/27*EMA26 + 2/27*float(funddata_list[ii][3])
+        EMA12 = 11/13*EMA12 + 2/13*float(funddata_list[ii][4])
+        EMA26 = 25/27*EMA26 + 2/27*float(funddata_list[ii][4])
         DIFF = EMA12 - EMA26
         DEA9 = 8/10*DEA9_list[-1] + 2/10*DIFF
         MACD = (DIFF-DEA9)*2
@@ -202,14 +244,14 @@ def MACDDIFF_Model_Select_pipeline(filename):
                 MACD_counter+=1
             else:
                 break
-        MACD_range = (float(funddata_list[0][3])-float(funddata_list[MACD_counter-1][3]))/float(funddata_list[MACD_counter-1][3])*100
+        MACD_range = (float(funddata_list[0][4])-float(funddata_list[MACD_counter-1][4]))/float(funddata_list[MACD_counter-1][4])*100
         MACD_predict = math.ceil(MACD_list[-1]/(MACD_list[-2]-MACD_list[-1]))
         cross_price = (DEA9_list[-1]-11/13*EMA12+25/27*EMA26)/(2/13-2/27)
         slope_price = ((5/8*(MACD_list[-1]*2-MACD_list[-2])+DEA9_list[-1]-11/13*EMA12+25/27*EMA26)/(2/13-2/27))
         parallel_price = (5/8*MACD+DEA9_list[-1]-11/13*EMA12+25/27*EMA26)/(2/13-2/27)
-        MACD_slope = (MACD_list[-1]-MACD_list[-2])/float(funddata_list[0][3])
-        DEA_ratio = DEA9_list[-1]/float(funddata_list[0][3])
-        MACD_result = [fundinfo, MACD_predict, MACD_counter, DEA_ratio, MACD_range, MACD_slope, funddata_list[0][3], round(cross_price,2), round(slope_price,2), round(parallel_price,2)]
+        MACD_slope = (MACD_list[-1]-MACD_list[-2])/float(funddata_list[0][4])
+        DEA_ratio = DEA9_list[-1]/float(funddata_list[0][4])
+        MACD_result = [fundinfo, MACD_predict, MACD_counter, DEA_ratio, MACD_range, MACD_slope, funddata_list[0][4], round(cross_price,2), round(slope_price,2), round(parallel_price,2)]
     if((DIFF_list[-2]<0) and (DIFF_list[-1]>DIFF_list[-2])):
         DIFF_counter = 1
         for ii in reversed(range(len(DIFF_list)-1)):
@@ -221,10 +263,10 @@ def MACDDIFF_Model_Select_pipeline(filename):
         cross_price = (25/27*EMA26-11/13*EMA12)/(2/13-2/27)
         slope_price = (2*DIFF_list[-1]-DIFF_list[-2]+25/27*EMA26-11/13*EMA12)/(2/13-2/27)
         parallel_price = (DIFF_list[-1]+25/27*EMA26-11/13*EMA12)/(2/13-2/27)
-        DIFF_slope = (DIFF_list[-1]-DIFF_list[-2])/float(funddata_list[0][3])
-        DEA_ratio = DEA9_list[-1]/float(funddata_list[0][3])
+        DIFF_slope = (DIFF_list[-1]-DIFF_list[-2])/float(funddata_list[0][4])
+        DEA_ratio = DEA9_list[-1]/float(funddata_list[0][4])
         DIFF_ratio = DIFF_list[-1]/DEA9_list[-1]
-        DIFF_result = [fundinfo, DIFF_predict, DIFF_counter, round(DIFF_ratio,2), DEA_ratio, DIFF_slope, funddata_list[0][3], round(cross_price,2), round(slope_price,2), round(parallel_price,2)]
+        DIFF_result = [fundinfo, DIFF_predict, DIFF_counter, round(DIFF_ratio,2), DEA_ratio, DIFF_slope, funddata_list[0][4], round(cross_price,2), round(slope_price,2), round(parallel_price,2)]
     return MACD_result, DIFF_result
 
 
@@ -261,11 +303,12 @@ def main():
         print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tFund Data Download Begin!")
         get_funddata()
         print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tFund Data Download Finished!")
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tData Prepare Finished!")
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tData Analyze Begin!")
-    analyze_funddata()
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tData Analyze Finished!")
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tData Prepare Finished!")
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tData Analyze Begin!")
+        analyze_funddata()
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tData Analyze Finished!")
 
 
 if __name__ =="__main__":
-    main()
+#    main()
+    analyze_funddata()

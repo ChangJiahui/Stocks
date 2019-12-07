@@ -49,7 +49,7 @@ def get_htmltext(url):
             continue
 #    print(response.text)
     try:
-        html_text = response.content.decode('utf8')
+        html_text = response.content.decode('utf-8-sig')
     except UnicodeDecodeError as e:
 #        print(e)
         html_text = response.content.decode('gbk')

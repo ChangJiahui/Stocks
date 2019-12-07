@@ -97,7 +97,7 @@ def get_htmltext(url):
             if(response.status_code!=200):
                 continue
             try:
-                html_text = response.content.decode('utf8')
+                html_text = response.content.decode('utf-8-sig')
             except UnicodeDecodeError as e:
                 html_text = response.content.decode('gbk')
 #                print(e)
@@ -2496,9 +2496,6 @@ def analyze_stockdata():
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tABCom_Model_Select Begin!")
     ABCom_Model_Select()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tABCom_Model_Select Finished!")
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tsummary_result Begin!")
-    summary_result()
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tsummary_result Finished!")
 
 
 def main():
