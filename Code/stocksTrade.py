@@ -90,6 +90,32 @@ def trade_analyze():
         else:
             return ""
 
+
+    def trend1T5_Model_Select_pipeline(stockdata_list):
+        _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+        stockinfo = filename.split(".")[0]
+        MA1_list = []
+        MA5_list = []
+        DIFF_list = []
+        for ii in range(10):
+            MA1_list.append(float(stockdata_list[ii][3]))
+            MA5_list.append(np.mean([float(item[3]) for item in stockdata_list[ii:ii+5]]))
+            DIFF_list.append(MA1_list[ii] - MA5_list[ii])
+        cross_price = sum([float(item[3]) for item in stockdata_list[:4]])/4
+        parallel_price = DIFF_list[-1]*5/4+cross_price
+        if((DIFF_list[0]>0) and (DIFF_list[1]<0)):
+            return "1日线上穿买入信号 买入价格: " + str(round(cross_price,2)) + "\n"
+        elif((DIFF_list[0]<0) and (DIFF_list[1]>0)):
+            return "1日线下穿卖出信号 卖出价格: " + str(round(cross_price,2)) + "\n"
+        elif((DIFF_list[0]>DIFF_list[1]) and (DIFF_list[1]<DIFF_list[2])):
+            return "1日线拐点买入信号 买入价格: " + str(round(parallel_price,2)) + "\n"
+        elif((DIFF_list[0]<DIFF_list[1]) and (DIFF_list[1]>DIFF_list[2])):
+            return "1日线拐点卖出信号 卖出价格: " + str(round(parallel_price,2)) + "\n"
+        else:
+            return ""
+        
+
+
     def MACD_Model_Trade_pipeline(stockdata_list):
         EMA12 = 0
         EMA26 = 0
@@ -298,6 +324,9 @@ def trade_analyze():
         if(tempstr!=""):
             resultstr = resultstr + stockinfo + tempstr
         tempstr = EMV_Model_Trade_pipeline(stockdata_list)
+        if(tempstr!=""):
+            resultstr = resultstr + stockinfo + tempstr
+        tempstr = trend1T5_Model_Select_pipeline(stockdata_list)
         if(tempstr!=""):
             resultstr = resultstr + stockinfo + tempstr
     write_csvfile(accountbook_path, title, trade_list)

@@ -124,14 +124,10 @@ def get_hexundata(fundinfo):
                 sp_td_list = sp_tr.find_all('td')
                 dividentdate = sp_td_list[1].text
                 dividenttext = sp_td_list[3].text
-                if(dividenttext=="暂未披露"):
-                    print("暂未披露")
-                    print(fundinfo)
-                    continue
-                divident = float(re.findall(r"1:(\d+\.\d+)", dividenttext)[0])
-                divident_list.append([dividentdate, dividentdate, divident, "divided"])
+                if(dividenttext!="暂未披露"):
+                    divident = float(re.findall(r"1:(\d+\.\d+)", dividenttext)[0])
+                    divident_list.append([dividentdate, dividentdate, divident, "divided"])
         divident_list.sort(reverse=True, key=lambda item: item[1])
-#        print(divident_list)
         fundoffset = len(funddata_list)
         for ii in reversed(range(len(divident_list))):
             for jj in reversed(range(1, fundoffset)):
@@ -149,8 +145,6 @@ def get_hexundata(fundinfo):
             funddata_list[ii][5] = ((float(funddata_list[ii][4])/float(funddata_list[ii+1][4]))-1)*100
         write_csvfile(funddata_file, title, funddata_list)
         check_funddata(funddata_file)
-    else:
-        print(fundinfo)
 
 
 def get_funddata():
@@ -310,5 +304,4 @@ def main():
 
 
 if __name__ =="__main__":
-#    main()
-    analyze_funddata()
+    main()

@@ -349,7 +349,7 @@ def EHBF_Analyze():
     write_csvfile(resultfile_path, title, resultdata_list)
 def EHBF_Analyze_par():
     resultfile_path = os.path.join(resultdata_path, "EHBF_Analyze_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "百日位置(%)", "获利持仓比例", "总交易日", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均6日振幅", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅", "1日换手率OBV", "6日换手率EMAOBV", "12日换手率EMAOBV", "26日换手率MEAOBV"]
+    title = ["股票名称", "当日涨跌幅", "百日位置(%)", "获利持仓比例", "总交易日", "10日标准差", "20日标准差", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均6日振幅", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(EHBF_Analyze_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -398,20 +398,6 @@ def EHBF_Analyze_pipeline(filename):
         EMA24_range = (closingprice - EMA24) / EMA24 * 100
         return EMA6_range, EMA12_range, EMA24_range
 
-    def EMAOBV_Analyze(stockdata_list):
-        EMAOBV6 = 0
-        EMAOBV12 = 0
-        EMAOBV26 = 0
-        for ii in reversed(range(min(100, len(stockdata_list)))):
-            if((float(stockdata_list[ii][4])-float(stockdata_list[ii][5]))==0):
-                OBV = np.sign(float(stockdata_list[ii][9])) * float(stockdata_list[ii][10])
-            else:
-                OBV = ((float(stockdata_list[ii][3])-float(stockdata_list[ii][5])-(float(stockdata_list[ii][4])-float(stockdata_list[ii][3])))/
-                    (float(stockdata_list[ii][4])-float(stockdata_list[ii][5]))*float(stockdata_list[ii][10]))
-            EMAOBV6 = EMAOBV6*5/7 + OBV*2/7
-            EMAOBV12 = EMAOBV12*11/13 + OBV*2/13
-            EMAOBV26 = EMAOBV26*25/27 + OBV*2/27
-        return OBV, EMAOBV6, EMAOBV12, EMAOBV26
 
     def earnratio_Analyze(stockdata_list):
         obv_dict = {}
@@ -455,6 +441,11 @@ def EHBF_Analyze_pipeline(filename):
                 break
         return stable5counter, stable10counter, stable20counter
 
+    def std_Analyze(stockdata_list):
+        std10 = np.std([float(item[3]) for item in stockdata_list[:min(10, len(stockdata_list))]])/np.mean([float(item[3]) for item in stockdata_list[:min(10, len(stockdata_list))]])
+        std20 = np.std([float(item[3]) for item in stockdata_list[:min(20, len(stockdata_list))]])/np.mean([float(item[3]) for item in stockdata_list[:min(20, len(stockdata_list))]])
+        return std10, std20
+
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     maxprice = max([float(item[3]) for item in stockdata_list[:100]])
@@ -463,11 +454,11 @@ def EHBF_Analyze_pipeline(filename):
     reboundrange = (closingprice-minprice)/(maxprice-minprice)*100
     stable5counter, stable10counter, stable20counter = stable_Analyze(stockdata_list)
     EMA6_range, EMA12_range, EMA24_range = EMA_Analyze(stockdata_list)
-    OBV, EMAOBV6, EMAOBV12, EMAOBV26 = EMAOBV_Analyze(stockdata_list)
+    std10, std20 = std_Analyze(stockdata_list)
     earnratio = earnratio_Analyze(stockdata_list[:500])
     drop30_range = (float(stockdata_list[0][3])-float(stockdata_list[min(30,len(stockdata_list)-1)][3]))/float(stockdata_list[min(30,len(stockdata_list)-1)][3])*100
     amplitude6 = np.mean([((float(item[4])-float(item[5]))/float(item[7])*100) for item in stockdata_list[:6]])
-    return [stockinfo, stockdata_list[0][9], reboundrange, earnratio, len(stockdata_list), stable5counter, stable10counter, stable20counter, amplitude6, EMA6_range, EMA12_range, EMA24_range, drop30_range, OBV, EMAOBV6, EMAOBV12, EMAOBV26]
+    return [stockinfo, stockdata_list[0][9], reboundrange, earnratio, len(stockdata_list), std10, std20, stable5counter, stable10counter, stable20counter, amplitude6, EMA6_range, EMA12_range, EMA24_range, drop30_range]
 
 
 def drop_Model_Select():
@@ -701,14 +692,14 @@ def box_Model_Select_pipeline(filename):
 def wave_Model_Select():
 # 波浪模型
     resultfile_path = os.path.join(resultdata_path, "wave_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "降浪波数", "升浪波数", "股票下跌天数", "股票反弹天数", "股票下跌幅度", "股票反弹幅度", "最近浪顶下跌", "最近浪底回升", "上一浪顶下跌", "上一浪底回升", "相邻浪顶涨跌", "相邻浪底涨跌"]
+    title = ["股票名称", "当日涨跌幅", "降浪波数", "升浪波数", "最近浪底回升", "最近回升天数", "最近浪顶下跌", "最近下跌天数", "上一浪底回升", "上一回升天数", "上一浪顶下跌", "上一下跌天数", "最近浪顶涨跌", "上一浪顶涨跌", "最近浪底涨跌", "上一浪底涨跌", "总回升幅度", "总回升天数", "总下跌幅度", "总下跌天数", "最大回升幅度", "最大回升天数", "最大下跌幅度", "最大下跌天数"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         resultdata_list.append(wave_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
 def wave_Model_Select_par():
     resultfile_path = os.path.join(resultdata_path, "wave_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "降浪波数", "升浪波数", "股票下跌天数", "股票反弹天数", "股票下跌幅度", "股票反弹幅度", "最近浪顶下跌", "最近浪底回升", "上一浪顶下跌", "上一浪底回升", "相邻浪顶涨跌", "相邻浪底涨跌"]
+    title = ["股票名称", "当日涨跌幅", "降浪波数", "升浪波数", "最近浪底回升", "最近回升天数", "最近浪顶下跌", "最近下跌天数", "上一浪底回升", "上一回升天数", "上一浪顶下跌", "上一下跌天数", "最近浪顶涨跌", "上一浪顶涨跌", "最近浪底涨跌", "上一浪底涨跌", "总回升幅度", "总回升天数", "总下跌幅度", "总下跌天数", "最大回升幅度", "最大回升天数", "最大下跌幅度", "最大下跌天数"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(wave_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -770,20 +761,43 @@ def wave_Model_Select_pipeline(filename):
             downwavecounter+=1
         else:
             break
-    if((len(maxprice_list)>2) and ((len(maxprice_list)>2))):
+    if((len(minprice_list)>3) and ((len(maxprice_list)>3))):
         minprice = minprice_list[upwavecounter]
         maxprice = maxprice_list[upwavecounter+1+downwavecounter]
-        minoffset = minoffset_list[upwavecounter]
-        maxoffset = maxoffset_list[upwavecounter+1+downwavecounter]
-        maxfailrange = (minprice-maxprice)/maxprice*100
-        maxreboundrange = (closingprice-minprice)/maxprice*100
+        sumfailrange = (minprice-maxprice)/maxprice*100
+        sumfailcounter = maxoffset_list[upwavecounter+1+downwavecounter] - minoffset_list[upwavecounter]
+        sumreboundrange = (closingprice-minprice)/minprice*100
+        sumreboundcounter = minoffset_list[upwavecounter]
         failrange = (minprice_list[0]-maxprice_list[0])/maxprice_list[0]*100
-        lastfailrange = (minprice_list[1]-maxprice_list[1])/maxprice_list[1]*100
+        failcounter = maxoffset_list[0]-minoffset_list[0]
         reboundrange = (closingprice-minprice_list[0])/minprice_list[0]*100
+        reboundcounter = minoffset_list[0]
+        lastfailrange = (minprice_list[1]-maxprice_list[1])/maxprice_list[1]*100
+        lastfailcounter = maxoffset_list[1]-minoffset_list[1]
         lastreboundrange = (maxprice_list[0]-minprice_list[1])/minprice_list[1]*100
+        lastreboundcounter = minoffset_list[1]-maxoffset_list[0]
         wavepeakratio = (maxprice_list[0]-maxprice_list[1])/maxprice_list[1]*100
+        lastwavepeakratio = (maxprice_list[1]-maxprice_list[2])/maxprice_list[2]*100
         wavevallratio = (minprice_list[0]-minprice_list[1])/minprice_list[1]*100
-        return [stockinfo, stockdata_list[0][9], downwavecounter, upwavecounter, (maxoffset-minoffset), minoffset, maxfailrange, maxreboundrange, failrange, reboundrange, lastfailrange, lastreboundrange, wavepeakratio, wavevallratio]
+        lastwavevallratio = (minprice_list[1]-minprice_list[2])/minprice_list[2]*100
+        maxfailrange = 0
+        maxreboundrange = 0
+        maxfailcounter = 0
+        maxreboundcounter = 0
+        for ii in range(2, len(minprice_list)-1):
+            tempfailrange = (minprice_list[ii]-maxprice_list[ii])/maxprice_list[ii]*100
+            tempreboundrange = (maxprice_list[ii]-minprice_list[ii+1])/minprice_list[ii]*100
+            tempfailcounter = maxoffset_list[ii]-minoffset_list[ii]
+            tempreboundcounter = minoffset_list[ii+1]-maxoffset_list[ii]
+            if(tempfailrange<maxfailrange):
+                maxfailrange = tempfailrange
+            if(tempreboundrange>maxreboundrange):
+                maxreboundrange = tempreboundrange
+            if(tempfailcounter>maxfailcounter):
+                maxfailcounter = tempfailcounter
+            if(tempreboundcounter>maxreboundcounter):
+                maxreboundcounter = tempreboundcounter
+        return [stockinfo, stockdata_list[0][9], downwavecounter, upwavecounter, reboundrange, reboundcounter, failrange, failcounter, lastreboundrange, lastreboundcounter, lastfailrange, lastfailcounter, wavepeakratio, lastwavepeakratio, wavevallratio, lastwavevallratio, sumreboundrange, sumreboundcounter, sumfailrange, sumfailcounter, maxreboundrange, maxreboundcounter, maxfailrange, maxfailcounter]
     else:
         return []
 
@@ -821,23 +835,23 @@ def volumn_Model_Select_pipeline(filename):
         return []
 
 
-def trend_Model_Select():
-# K线图 日线 贯穿 5日线 	可拓展为 N1日线 贯穿 N2日线
-    resultfile_path = os.path.join(resultdata_path, "trend_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "日线上穿5日线预测天数", "5日线下方天数", "股票上穿前总跌幅", "当前价格", "日线交叉价格", "日线平行价格"]
+def trend1T5_Model_Select():
+# K线图 1日线 贯穿 5日线 	可拓展为 N1日线 贯穿 N2日线
+    resultfile_path = os.path.join(resultdata_path, "trend1T5_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "1日线上穿5日线预测天数", "5日线下方天数", "股票上穿前总跌幅", "当前价格", "日线交叉价格", "日线平行价格"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
-        resultdata_list.append(trend_Model_Select_pipeline(filename))
+        resultdata_list.append(trend1T5_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
-def trend_Model_Select_par():
-    resultfile_path = os.path.join(resultdata_path, "trend_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "日线上穿5日线预测天数", "5日线下方天数", "股票上穿前总跌幅", "当前价格", "日线交叉价格", "日线平行价格"]
+def trend1T5_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "trend1T5_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "1日线上穿5日线预测天数", "5日线下方天数", "股票上穿前总跌幅", "当前价格", "日线交叉价格", "日线平行价格"]
     pool = multiprocessing.Pool(4)
-    resultdata_list = pool.map(trend_Model_Select_pipeline, os.listdir(stockdata_path))
+    resultdata_list = pool.map(trend1T5_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
     pool.join()
     write_csvfile(resultfile_path, title, resultdata_list)
-def trend_Model_Select_pipeline(filename):
+def trend1T5_Model_Select_pipeline(filename):
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     MA1_list = []
@@ -859,29 +873,73 @@ def trend_Model_Select_pipeline(filename):
         trend_range = (float(stockdata_list[0][3])-float(stockdata_list[trend_counter][3]))/float(stockdata_list[trend_counter][3])*100
         trend_predict = math.ceil(DIFF_list[0]/(DIFF_list[1]-DIFF_list[0]))
         cross_price = sum([float(item[3]) for item in stockdata_list[:4]])/4
-        parallel_price = 5*DIFF_list[-1]/4+cross_price
+        parallel_price = DIFF_list[0]*5/4+cross_price
         return [stockinfo, stockdata_list[0][9], trend_predict, trend_counter, trend_range, stockdata_list[0][3], round(cross_price,2), round(parallel_price,2)]
     else:
         return []
 
 
-def trend5_Model_Select():
-# K线图 5日线 贯穿 10日线 	可拓展为 N1日线 贯穿 N2日线
-    resultfile_path = os.path.join(resultdata_path, "trend5_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "5日线上穿10日线预测天数", "10日线下方天数", "股票上穿前总跌幅", "当前价格", "日线交叉价格", "日线平行价格"]
+def trend1T10_Model_Select():
+# K线图 1日线 贯穿 10日线 	可拓展为 N1日线 贯穿 N2日线
+    resultfile_path = os.path.join(resultdata_path, "trend1T10_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "1日线上穿10日线预测天数", "10日线下方天数", "股票上穿前总跌幅", "当前价格", "日线交叉价格", "日线平行价格"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
-        resultdata_list.append(trend5_Model_Select_pipeline(filename))
+        resultdata_list.append(trend1T10_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
-def trend5_Model_Select_par():
-    resultfile_path = os.path.join(resultdata_path, "trend5_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "5日线上穿10日线预测天数", "10日线下方天数", "股票上穿前总跌幅", "当前价格", "日线交叉价格", "日线平行价格"]
+def trend1T10_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "trend1T10_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "1日线上穿10日线预测天数", "10日线下方天数", "股票上穿前总跌幅", "当前价格", "日线交叉价格", "日线平行价格"]
     pool = multiprocessing.Pool(4)
-    resultdata_list = pool.map(trend5_Model_Select_pipeline, os.listdir(stockdata_path))
+    resultdata_list = pool.map(trend1T10_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
     pool.join()
     write_csvfile(resultfile_path, title, resultdata_list)
-def trend5_Model_Select_pipeline(filename):
+def trend1T10_Model_Select_pipeline(filename):
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    MA1_list = []
+    MA10_list = []
+    DIFF_list = []
+    if(len(stockdata_list)<130):
+        return []
+    for ii in range(100):
+        MA1_list.append(float(stockdata_list[ii][3]))
+        MA10_list.append(np.mean([float(item[3]) for item in stockdata_list[ii:ii+10]]))
+        DIFF_list.append(MA1_list[ii] - MA10_list[ii])
+    if((DIFF_list[1]<0) and (DIFF_list[0]>DIFF_list[1]) and (float(stockdata_list[0][3])>MA10_list[0])):
+        trend_counter = 1
+        for ii in range(1, len(DIFF_list)):
+            if(DIFF_list[ii]<0):
+                trend_counter += 1
+            else:
+                break
+        trend_range = (float(stockdata_list[0][3])-float(stockdata_list[trend_counter][3]))/float(stockdata_list[trend_counter][3])*100
+        trend_predict = math.ceil(DIFF_list[0]/(DIFF_list[1]-DIFF_list[0]))
+        cross_price = sum([float(item[3]) for item in stockdata_list[:9]])/9
+        parallel_price = DIFF_list[0]*10/9+cross_price
+        return [stockinfo, stockdata_list[0][9], trend_predict, trend_counter, trend_range, stockdata_list[0][3], round(cross_price,2), round(parallel_price,2)]
+    else:
+        return []
+
+
+def trend5T10_Model_Select():
+# K线图 5日线 贯穿 10日线 	可拓展为 N1日线 贯穿 N2日线
+    resultfile_path = os.path.join(resultdata_path, "trend5T10_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "5日线上穿10日线预测天数", "10日线下方天数", "股票上穿前总跌幅", "当前价格", "日线交叉价格", "日线平行价格"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(trend5T10_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def trend5T10_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "trend5T10_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "5日线上穿10日线预测天数", "10日线下方天数", "股票上穿前总跌幅", "当前价格", "日线交叉价格", "日线平行价格"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(trend5T10_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def trend5T10_Model_Select_pipeline(filename):
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     MA5_list = []
@@ -903,29 +961,29 @@ def trend5_Model_Select_pipeline(filename):
         trend_range = (float(stockdata_list[0][3])-float(stockdata_list[trend_counter][3]))/float(stockdata_list[trend_counter][3])*100
         trend_predict = math.ceil(DIFF_list[0]/(DIFF_list[1]-DIFF_list[0]))
         cross_price = sum([float(item[3]) for item in stockdata_list[:9]])-2*sum([float(item[3]) for item in stockdata_list[:4]])
-        parallel_price = 10*DIFF_list[-1]+cross_price
+        parallel_price = 10*DIFF_list[0]+cross_price
         return [stockinfo, stockdata_list[0][9], trend_predict, trend_counter, trend_range, stockdata_list[0][3], round(cross_price,2), round(parallel_price,2)]
     else:
         return []
 
 
-def trend10_Model_Select():
+def trend10T30_Model_Select():
 # K线图 10日线 贯穿 30日线 	可拓展为 N1日线 贯穿 N2日线
-    resultfile_path = os.path.join(resultdata_path, "trend10_Model_Select_Result.csv")
+    resultfile_path = os.path.join(resultdata_path, "trend10T30_Model_Select_Result.csv")
     title = ["股票名称", "当日涨跌幅", "10日线上穿30日线预测天数", "30日线下方天数", "股票上穿前总跌幅", "当前价格", "日线交叉价格", "日线平行价格"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
-        resultdata_list.append(trend10_Model_Select_pipeline(filename))
+        resultdata_list.append(trend10T30_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
-def trend10_Model_Select_par():
-    resultfile_path = os.path.join(resultdata_path, "trend10_Model_Select_Result.csv")
+def trend10T30_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "trend10T30_Model_Select_Result.csv")
     title = ["股票名称", "当日涨跌幅", "10日线上穿30日线预测天数", "30日线下方天数", "股票上穿前总跌幅", "当前价格", "日线交叉价格", "日线平行价格"]
     pool = multiprocessing.Pool(4)
-    resultdata_list = pool.map(trend10_Model_Select_pipeline, os.listdir(stockdata_path))
+    resultdata_list = pool.map(trend10T30_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
     pool.join()
     write_csvfile(resultfile_path, title, resultdata_list)
-def trend10_Model_Select_pipeline(filename):
+def trend10T30_Model_Select_pipeline(filename):
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     MA10_list = []
@@ -947,7 +1005,7 @@ def trend10_Model_Select_pipeline(filename):
         trend_range = (float(stockdata_list[0][3])-float(stockdata_list[trend_counter][3]))/float(stockdata_list[trend_counter][3])*100
         trend_predict = math.ceil(DIFF_list[0]/(DIFF_list[1]-DIFF_list[0]))
         cross_price = (sum([float(item[3]) for item in stockdata_list[:29]])-3*sum([float(item[3]) for item in stockdata_list[:9]]))/2
-        parallel_price = 15*DIFF_list[-1]+cross_price
+        parallel_price = 15*DIFF_list[0]+cross_price
         return [stockinfo, stockdata_list[0][9], trend_predict, trend_counter, trend_range, stockdata_list[0][3], round(cross_price,2), round(parallel_price,2)]
     else:
         return []
@@ -1473,11 +1531,7 @@ def obv_Model_Select_pipeline(filename):
     OBVMACD_result = []
     OBVDIFF_result = []
     for ii in reversed(range(min(100, len(stockdata_list)))):
-        if((float(stockdata_list[ii][4])-float(stockdata_list[ii][5]))==0):
-            OBV = np.sign(float(stockdata_list[ii][9])) * float(stockdata_list[ii][10])
-        else:
-            OBV = ((float(stockdata_list[ii][3])-float(stockdata_list[ii][5])-(float(stockdata_list[ii][4])-float(stockdata_list[ii][3])))/
-                (float(stockdata_list[ii][4])-float(stockdata_list[ii][5]))*float(stockdata_list[ii][10]))
+        OBV = float(stockdata_list[ii][10])
         OBVEMA12 = 11/13*OBVEMA12 + 2/13*OBV
         OBVEMA26 = 25/27*OBVEMA26 + 2/27*OBV
         OBVDIFF = OBVEMA12 - OBVEMA26
@@ -1487,6 +1541,9 @@ def obv_Model_Select_pipeline(filename):
         OBVDIFF_list.append(OBVDIFF)
         OBVDEA9_list.append(OBVDEA9)
         OBVMACD_list.append((OBVDIFF-OBVDEA9)*2)
+    OBVMA5 = sum(OBV_list[-5:])/5
+    OBVMA10 = sum(OBV_list[-10:])/10
+    OBVMA30 = sum(OBV_list[-30:])/30
     if((OBVMACD_list[-2]<0) and (OBVMACD_list[-1]>OBVMACD_list[-2]) and (OBVDEA9_list[-2]<0)):
         OBVMACD_counter = 1
         for ii in reversed(range(len(OBVMACD_list)-1)):
@@ -1496,10 +1553,7 @@ def obv_Model_Select_pipeline(filename):
                 break
         OBVMACD_range = (float(stockdata_list[0][3])-float(stockdata_list[OBVMACD_counter-1][3]))/float(stockdata_list[OBVMACD_counter-1][3])*100
         OBVMACD_predict = math.ceil(OBVMACD_list[-1]/(OBVMACD_list[-2]-OBVMACD_list[-1]))
-        OBV5 = sum(OBV_list[-5:])
-        OBV10 = sum(OBV_list[-10:])
-        OBV30 = sum(OBV_list[-30:])
-        OBVMACD_result = [stockinfo, stockdata_list[0][9], OBVMACD_predict, OBVMACD_counter, OBVMACD_range, OBV5, OBV10, OBV30]
+        OBVMACD_result = [stockinfo, stockdata_list[0][9], OBVMACD_predict, OBVMACD_counter, OBVMACD_range, OBVMA5, OBVMA10, OBVMA30]
     if((OBVDIFF_list[-2]<0) and (OBVDIFF_list[-1]>OBVDIFF_list[-2])):
         OBVDIFF_counter = 1
         for ii in reversed(range(len(OBVDIFF_list)-1)):
@@ -1509,7 +1563,7 @@ def obv_Model_Select_pipeline(filename):
                 break
         OBVDIFF_range = (float(stockdata_list[0][3])-float(stockdata_list[OBVDIFF_counter-1][3]))/float(stockdata_list[OBVDIFF_counter-1][3])*100
         OBVDIFF_predict = math.ceil(OBVDIFF_list[-1]/(OBVDIFF_list[-2]-OBVDIFF_list[-1]))
-        OBVDIFF_result = [stockinfo, stockdata_list[0][9], OBVDIFF_predict, OBVDIFF_counter, OBVDIFF_range, sum(OBV_list[-5:]), sum(OBV_list[-10:]), sum(OBV_list[-30:])]
+        OBVDIFF_result = [stockinfo, stockdata_list[0][9], OBVDIFF_predict, OBVDIFF_counter, OBVDIFF_range, OBVMA5, OBVMA10, OBVMA30]
     return OBVMACD_result, OBVDIFF_result
 
 
@@ -2150,23 +2204,23 @@ def MACDDIFFMonth_Model_Select_pipeline(filename):
     return MACD_result, DIFF_result
 
 
-def trendMonth_Model_Select():
-# K线图 月线 贯穿 5月线  可拓展为 N1月线 贯穿 N2月线
-    resultfile_path = os.path.join(resultdata_path, "trendMonth_Model_Select_Result.csv")
-    title = ["股票名称", "当月涨跌幅", "月线上穿5月线预测月数", "5月线下方天数", "股票上穿前总跌幅", "当前价格", "月线交叉价格", "月线平行价格"]
+def trend1T5Month_Model_Select():
+# K线图 1月线 贯穿 5月线  可拓展为 N1月线 贯穿 N2月线
+    resultfile_path = os.path.join(resultdata_path, "trend1T5Month_Model_Select_Result.csv")
+    title = ["股票名称", "当月涨跌幅", "1月线上穿5月线预测月数", "5月线下方天数", "股票上穿前总跌幅", "当前价格", "月线交叉价格", "月线平行价格"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
-        resultdata_list.append(trendMonth_Model_Select_pipeline(filename))
+        resultdata_list.append(trend1T5Month_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
-def trendMonth_Model_Select_par():
-    resultfile_path = os.path.join(resultdata_path, "trendMonth_Model_Select_Result.csv")
-    title = ["股票名称", "当月涨跌幅", "月线上穿5月线预测月数", "5月线下方天数", "股票上穿前总跌幅", "当前价格", "月线交叉价格", "月线平行价格"]
+def trend1T5Month_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "trend1T5Month_Model_Select_Result.csv")
+    title = ["股票名称", "当月涨跌幅", "1月线上穿5月线预测月数", "5月线下方天数", "股票上穿前总跌幅", "当前价格", "月线交叉价格", "月线平行价格"]
     pool = multiprocessing.Pool(4)
-    resultdata_list = pool.map(trendMonth_Model_Select_pipeline, os.listdir(stockdata_path))
+    resultdata_list = pool.map(trend1T5Month_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
     pool.join()
     write_csvfile(resultfile_path, title, resultdata_list)
-def trendMonth_Model_Select_pipeline(filename):
+def trend1T5Month_Model_Select_pipeline(filename):
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     monthclosingprice_list, monthmaxprice_list, monthminprice_list = get_MonthData(stockdata_list)
@@ -2196,23 +2250,69 @@ def trendMonth_Model_Select_pipeline(filename):
         return []
 
 
-def trendMonth5_Model_Select():
-# K线图 5月线 贯穿 10月线  可拓展为 N1月线 贯穿 N2月线
-    resultfile_path = os.path.join(resultdata_path, "trendMonth5_Model_Select_Result.csv")
-    title = ["股票名称", "当月涨跌幅", "5月线上穿10月线预测月数", "10月线下方天数", "股票上穿前总跌幅", "当前价格", "月线交叉价格", "月线平行价格"]
+def trend1T10Month_Model_Select():
+# K线图 1月线 贯穿 10月线  可拓展为 N1月线 贯穿 N2月线
+    resultfile_path = os.path.join(resultdata_path, "trend1T10Month_Model_Select_Result.csv")
+    title = ["股票名称", "当月涨跌幅", "1月线上穿10月线预测月数", "10月线下方天数", "股票上穿前总跌幅", "当前价格", "月线交叉价格", "月线平行价格"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
-        resultdata_list.append(trendMonth5_Model_Select_pipeline(filename))
+        resultdata_list.append(trend1T10Month_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
-def trendMonth5_Model_Select_par():
-    resultfile_path = os.path.join(resultdata_path, "trendMonth5_Model_Select_Result.csv")
-    title = ["股票名称", "当月涨跌幅", "5月线上穿10月线预测月数", "10月线下方天数", "股票上穿前总跌幅", "当前价格", "月线交叉价格", "月线平行价格"]
+def trend1T10Month_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "trend1T10Month_Model_Select_Result.csv")
+    title = ["股票名称", "当月涨跌幅", "1月线上穿10月线预测月数", "10月线下方天数", "股票上穿前总跌幅", "当前价格", "月线交叉价格", "月线平行价格"]
     pool = multiprocessing.Pool(4)
-    resultdata_list = pool.map(trendMonth5_Model_Select_pipeline, os.listdir(stockdata_path))
+    resultdata_list = pool.map(trend1T10Month_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
     pool.join()
     write_csvfile(resultfile_path, title, resultdata_list)
-def trendMonth5_Model_Select_pipeline(filename):
+def trend1T10Month_Model_Select_pipeline(filename):
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    monthclosingprice_list, monthmaxprice_list, monthminprice_list = get_MonthData(stockdata_list)
+    MA1_list = []
+    MA10_list = []
+    DIFF_list = []
+    if(len(monthclosingprice_list)<20):
+        return []
+    for ii in range(min(100, len(monthclosingprice_list)-(10-1))):
+        MA1_list.append(monthclosingprice_list[ii])
+        MA10_list.append(np.mean(monthclosingprice_list[ii:ii+10]))
+        DIFF_list.append(MA1_list[ii] - MA10_list[ii])
+    if((DIFF_list[1]<0) and (DIFF_list[0]>DIFF_list[1])):
+        trend_counter = 1
+        for ii in range(1, len(DIFF_list)):
+            if(DIFF_list[ii]<0):
+                trend_counter += 1
+            else:
+                break
+        trend_range = (monthclosingprice_list[0]-monthclosingprice_list[trend_counter])/monthclosingprice_list[trend_counter]*100
+        trend_predict = DIFF_list[0]/(DIFF_list[1]-DIFF_list[0])
+        cross_price = sum(monthclosingprice_list[:9])/9
+        parallel_price = DIFF_list[0]*10/9+cross_price
+        month_range = (monthclosingprice_list[0]-monthclosingprice_list[1])/monthclosingprice_list[1]*100
+        return [stockinfo, month_range, round(trend_predict,2), trend_counter, trend_range, monthclosingprice_list[0], round(cross_price,2), round(parallel_price,2)]
+    else:
+        return []
+
+
+def trend5T10Month_Model_Select():
+# K线图 5月线 贯穿 10月线  可拓展为 N1月线 贯穿 N2月线
+    resultfile_path = os.path.join(resultdata_path, "trend5T10Month_Model_Select_Result.csv")
+    title = ["股票名称", "当月涨跌幅", "5月线上穿10月线预测月数", "10月线下方天数", "股票上穿前总跌幅", "当前价格", "月线交叉价格", "月线平行价格"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(trend5T10Month_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def trend5T10Month_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "trend5T10Month_Model_Select_Result.csv")
+    title = ["股票名称", "当月涨跌幅", "5月线上穿10月线预测月数", "10月线下方天数", "股票上穿前总跌幅", "当前价格", "月线交叉价格", "月线平行价格"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(trend5T10Month_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def trend5T10Month_Model_Select_pipeline(filename):
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     monthclosingprice_list, monthmaxprice_list, monthminprice_list = get_MonthData(stockdata_list)
@@ -2324,10 +2424,10 @@ def generate_query_pipeline(stockinfo):
 
 def summary_result():
     resultfile_path = os.path.join(resultdata_path, "summary_result.csv")
-    summaryfile_list = ["trend_Model_Select_Result.csv", "trend5_Model_Select_Result.csv", "trend10_Model_Select_Result.csv", "MACD_Model_Select_Result.csv", "DIFF_Model_Select_Result.csv",
+    summaryfile_list = ["trend1T5_Model_Select_Result.csv", "trend5T10_Model_Select_Result.csv", "trend10T30_Model_Select_Result.csv", "MACD_Model_Select_Result.csv", "DIFF_Model_Select_Result.csv",
     "DIFFLong_Model_Select_Result.csv", "MACDLong_Model_Select_Result.csv", "DIFFShort_Model_Select_Result.csv", "MACDShort_Model_Select_Result.csv",
      "KDJ_Model_Select_Result.csv", "DMI_Model_Select_Result.csv", "ADX_Model_Select_Result.csv", "EMV_Model_Select_Result.csv", "EMVMACD_Model_Select_Result.csv",
-     "trendMonth_Model_Select_Result.csv", "trendMonth5_Model_Select_Result.csv", "MACDMonth_Model_Select_Result.csv", "DIFFMonth_Model_Select_Result.csv", "KDJMonth_Model_Select_Result.csv"]
+     "trend1T5Month_Model_Select_Result.csv", "trend5T10Month_Model_Select_Result.csv", "MACDMonth_Model_Select_Result.csv", "DIFFMonth_Model_Select_Result.csv", "KDJMonth_Model_Select_Result.csv"]
     for ii in reversed(range(len(summaryfile_list))):
         if(not os.path.exists(os.path.join(resultdata_path, summaryfile_list[ii]))):
             summaryfile_list.pop(ii)
@@ -2341,10 +2441,10 @@ def summary_result():
     write_csvfile(resultfile_path, title, resultdata_list)
 def summary_result_par():
     resultfile_path = os.path.join(resultdata_path, "summary_result.csv")
-    selectfile_list = ["trend_Model_Select_Result.csv", "trend5_Model_Select_Result.csv", "trend10_Model_Select_Result.csv", "MACD_Model_Select_Result.csv", "DIFF_Model_Select_Result.csv",
+    selectfile_list = ["trend1T5_Model_Select_Result.csv", "trend5T10_Model_Select_Result.csv", "trend10T30_Model_Select_Result.csv", "MACD_Model_Select_Result.csv", "DIFF_Model_Select_Result.csv",
     "DIFFLong_Model_Select_Result.csv", "MACDLong_Model_Select_Result.csv", "DIFFShort_Model_Select_Result.csv", "MACDShort_Model_Select_Result.csv",
      "KDJ_Model_Select_Result.csv", "DMI_Model_Select_Result.csv", "ADX_Model_Select_Result.csv", "EMV_Model_Select_Result.csv", "EMVMACD_Model_Select_Result.csv",
-     "trendMonth_Model_Select_Result.csv", "trendMonth5_Model_Select_Result.csv", "MACDMonth_Model_Select_Result.csv", "DIFFMonth_Model_Select_Result.csv", "KDJMonth_Model_Select_Result.csv"]
+     "trend1T5Month_Model_Select_Result.csv", "trend5T10Month_Model_Select_Result.csv", "MACDMonth_Model_Select_Result.csv", "DIFFMonth_Model_Select_Result.csv", "KDJMonth_Model_Select_Result.csv"]
     for ii in reversed(range(len(selectfile_list))):
         if(not os.path.exists(os.path.join(resultdata_path, selectfile_list[ii]))):
             selectfile_list.pop(ii)
@@ -2358,10 +2458,10 @@ def summary_result_par():
     pool.join()
     write_csvfile(resultfile_path, title, resultdata_list)
 def summary_result_pipeline(stockinfo):
-    selectfile_list = ["trend_Model_Select_Result.csv", "trend5_Model_Select_Result.csv", "trend10_Model_Select_Result.csv", "MACD_Model_Select_Result.csv", "DIFF_Model_Select_Result.csv",
+    selectfile_list = ["trend1T5_Model_Select_Result.csv", "trend5T10_Model_Select_Result.csv", "trend10T30_Model_Select_Result.csv", "MACD_Model_Select_Result.csv", "DIFF_Model_Select_Result.csv",
     "DIFFLong_Model_Select_Result.csv", "MACDLong_Model_Select_Result.csv", "DIFFShort_Model_Select_Result.csv", "MACDShort_Model_Select_Result.csv",
      "KDJ_Model_Select_Result.csv", "DMI_Model_Select_Result.csv", "ADX_Model_Select_Result.csv", "EMV_Model_Select_Result.csv", "EMVMACD_Model_Select_Result.csv",
-     "trendMonth_Model_Select_Result.csv", "trendMonth5_Model_Select_Result.csv", "MACDMonth_Model_Select_Result.csv", "DIFFMonth_Model_Select_Result.csv", "KDJMonth_Model_Select_Result.csv"]
+     "trend1T5Month_Model_Select_Result.csv", "trend5T10Month_Model_Select_Result.csv", "MACDMonth_Model_Select_Result.csv", "DIFFMonth_Model_Select_Result.csv", "KDJMonth_Model_Select_Result.csv"]
     for ii in reversed(range(len(selectfile_list))):
         if(not os.path.exists(os.path.join(resultdata_path, selectfile_list[ii]))):
             summaryfile_list.pop(ii)
@@ -2405,18 +2505,18 @@ def analyze_stockdata():
 #    volumn_Model_Select()
     volumn_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tVolumn_Model_Select Finished!")
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttrend_Model_Select Begin!")
-#    trend_Model_Select()
-    trend_Model_Select_par()
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttrend_Model_Select Finished!")
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttrend5_Model_Select Begin!")
-#    trend5_Model_Select()
-    trend5_Model_Select_par()
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttrend5_Model_Select Finished!")
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttrend10_Model_Select Begin!")
-#    trend10_Model_Select()
-    trend10_Model_Select_par()
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttrend10_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttrend1T5_Model_Select Begin!")
+#    trend1T5_Model_Select()
+    trend1T5_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttrend1T5_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttrend5T10_Model_Select Begin!")
+#    trend5T10_Model_Select()
+    trend5T10_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttrend5T10_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttrend10T30_Model_Select Begin!")
+#    trend10T30_Model_Select()
+    trend10T30_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttrend10T30_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMACDDIFF_Model_Select Begin!")
 #    MACDDIFF_Model_Select()
     MACDDIFF_Model_Select_par()
@@ -2469,14 +2569,14 @@ def analyze_stockdata():
 #    MACDDIFFMonth_Model_Select()
     MACDDIFFMonth_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMACDDIFFMonth_Model_Select Finished!")
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttrendMonth_Model_Select Begin!")
-#    trendMonth_Model_Select()
-    trendMonth_Model_Select_par()
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttrendMonth_Model_Select Finished!")
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttrendMonth5_Model_Select Begin!")
-#    trendMonth5_Model_Select()
-    trendMonth5_Model_Select_par()
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttrendMonth5_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttrend1T5Month_Model_Select Begin!")
+#    trend1T5Month_Model_Select()
+    trend1T5Month_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttrend1T5Month_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttrend5T10Month_Model_Select Begin!")
+#    trend5T10Month_Model_Select()
+    trend5T10Month_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttrend5T10Month_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tmargin_Model_Select Begin!")
     margin_Model_Select()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tmargin_Model_Select Finished!")
