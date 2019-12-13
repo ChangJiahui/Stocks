@@ -266,7 +266,7 @@ def trade_analyze():
         EMV_list = [0]
         MAEMV_list = [0]
         DIFF_list = [0]
-        for ii in range(min(100, len(stockdata_list)-1)):
+        for ii in reversed(range(min(100, len(stockdata_list)-1))):
             MID = (float(stockdata_list[ii][3])+float(stockdata_list[ii][4])+float(stockdata_list[ii][5]))/3 - (float(stockdata_list[ii-1][3])+float(stockdata_list[ii-1][4])+float(stockdata_list[ii-1][5]))/3
             BRO = float(stockdata_list[ii][10])/max(float(stockdata_list[ii][4])-float(stockdata_list[ii][5]), 0.01)
             EM = MID/BRO

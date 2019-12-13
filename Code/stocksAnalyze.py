@@ -314,7 +314,7 @@ def get_stockdata():
 def EHBF_Analyze():
 # 横盘天数 & 振幅 & EMA & MAOBV & PE & PB
     resultfile_path = os.path.join(resultdata_path, "EHBF_Analyze_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "百日位置(%)", "获利持仓比例", "总交易日", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均6日振幅", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅", "1日换手率OBV", "6日换手率EMAOBV", "12日换手率EMAOBV", "26日换手率MEAOBV"]
+    title = ["股票名称", "当日涨跌幅", "百日位置(%)", "总交易日", "获利持仓比例", "压力筹码比例", "支撑筹码比例", "10日标准差", "20日标准差", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均10日振幅", "平均20日振幅", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         resultdata_list.append(EHBF_Analyze_pipeline(filename))
@@ -323,20 +323,25 @@ def EHBF_Analyze():
         for ii in range(len(resultdata_list)):
             stockcode = resultdata_list[ii][0][-6:]
             stock_df = df_todays[df_todays.ts_code.str.contains(stockcode)]
+            stock_pb = np.nan
+            stock_pe = np.nan
+            stock_pettm = np.nan
+            stock_ps = np.nan
+            stock_psttm = np.nan
             if(not stock_df.empty):
                 stock_pb = stock_df["pb"].values[0]
                 stock_pe = stock_df["pe"].values[0]
                 stock_pettm = stock_df["pe_ttm"].values[0]
                 stock_ps = stock_df["ps"].values[0]
                 stock_psttm = stock_df["ps_ttm"].values[0]
-                resultdata_list[ii] = resultdata_list[ii] + [stock_pb, stock_pe, stock_pettm, stock_ps, stock_psttm]
+            resultdata_list[ii] = resultdata_list[ii] + [stock_pb, stock_pe, stock_pettm, stock_ps, stock_psttm]
         title = title + ["市净率(pb)", "市盈率(pe)", "pe(TTM)", "市销率(ps)", "ps(TTM)"]
     except Exception as e:
         print(e)
     for ii in range(len(resultdata_list)):
         time.sleep(random.choice([1.2,2]))
         stockcode = resultdata_list[ii][0][-6:]
-        stock_pledge = 0
+        stock_pledge = np.nan
         try:
             df_pledge = tspro.pledge_stat(ts_code=gen_tscode(stockcode))
             if(not df_pledge.empty):
@@ -349,7 +354,7 @@ def EHBF_Analyze():
     write_csvfile(resultfile_path, title, resultdata_list)
 def EHBF_Analyze_par():
     resultfile_path = os.path.join(resultdata_path, "EHBF_Analyze_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "百日位置(%)", "获利持仓比例", "总交易日", "10日标准差", "20日标准差", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均6日振幅", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅"]
+    title = ["股票名称", "当日涨跌幅", "百日位置(%)", "总交易日", "获利持仓比例", "压力筹码比例", "支撑筹码比例", "10日标准差", "20日标准差", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均10日振幅", "平均20日振幅", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(EHBF_Analyze_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -359,20 +364,25 @@ def EHBF_Analyze_par():
         for ii in range(len(resultdata_list)):
             stockcode = resultdata_list[ii][0][-6:]
             stock_df = df_todays[df_todays.ts_code.str.contains(stockcode)]
+            stock_pb = np.nan
+            stock_pe = np.nan
+            stock_pettm = np.nan
+            stock_ps = np.nan
+            stock_psttm = np.nan
             if(not stock_df.empty):
                 stock_pb = stock_df["pb"].values[0]
                 stock_pe = stock_df["pe"].values[0]
                 stock_pettm = stock_df["pe_ttm"].values[0]
                 stock_ps = stock_df["ps"].values[0]
                 stock_psttm = stock_df["ps_ttm"].values[0]
-                resultdata_list[ii] = resultdata_list[ii] + [stock_pb, stock_pe, stock_pettm, stock_ps, stock_psttm]
+            resultdata_list[ii] = resultdata_list[ii] + [stock_pb, stock_pe, stock_pettm, stock_ps, stock_psttm]
         title = title + ["市净率(pb)", "市盈率(pe)", "pe(TTM)", "市销率(ps)", "ps(TTM)"]
     except Exception as e:
         print(e)
     for ii in range(len(resultdata_list)):
         time.sleep(random.choice([1.2,2]))
         stockcode = resultdata_list[ii][0][-6:]
-        stock_pledge = 0
+        stock_pledge = np.nan
         try:
             df_pledge = tspro.pledge_stat(ts_code=gen_tscode(stockcode))
             if(not df_pledge.empty):
@@ -413,31 +423,43 @@ def EHBF_Analyze_pipeline(filename):
             aveobv = obv/((maxprice+0.01-minprice)*100)
             for price in [item/100 for item in range(round(minprice*100), round((maxprice+0.01)*100))]:
                 obv_dict[price] += aveobv
+        obv_sum = sum(obv_dict.values())
+        supportobv = 0
+        for price in [item/100 for item in range(round(max(closingprice*0.9, lowerprice)*100), round(closingprice*100))];
+            supportobv += obv_dict[price]
+        supportratio = supportobv/obv_sum
+        pressureobv = 0
+        for price in [item/100 for item in range(round(closingprice*100), round(min(closingprice*1.1, upperprice)*100))]:
+            pressureobv += obv_dict[price]
+        pressureratio = pressureobv/obv_sum
         earnobv = 0
         for price in [item/100 for item in range(round(lowerprice*100), round(closingprice*100))]:
             earnobv += obv_dict[price]
-        earnratio = earnobv/sum(obv_dict.values())
-        return earnratio
+        earnratio = earnobv/obv_sum
+        return pressureratio, supportratio, earnratio
     
     def stable_Analyze(stockdata_list):
-        closingprice = float(stockdata_list[0][3])
+        closingprice_list = [float(item[3]) for item in stockdata_list]
         stable5counter = 0
         stable10counter = 0
         stable20counter = 0
-        for ii in range(1, len(stockdata_list)):
-            if(-0.05<=((float(stockdata_list[ii][3])-closingprice)/closingprice)<=0.05):
-                stable5counter += 1
-            else:
+        for ii in range(2, len(stockdata_list)):
+            minprice = min(closingprice_list[:ii])
+            maxprice = max(closingprice_list[:ii])
+            if((maxprice-minprice)>0.05*maxprice):
+                stable5counter = ii-1
                 break
-        for ii in range(1, len(stockdata_list)):
-            if(-0.10<=((float(stockdata_list[ii][3])-closingprice)/closingprice)<=0.10):
-                stable10counter += 1
-            else:
+        for ii in range(stable5counter+1, len(stockdata_list)):
+            minprice = min(closingprice_list[:ii])
+            maxprice = max(closingprice_list[:ii])
+            if((maxprice-minprice)>0.1*maxprice):
+                stable10counter = ii-1
                 break
-        for ii in range(1, len(stockdata_list)):
-            if(-0.20<=((float(stockdata_list[ii][3])-closingprice)/closingprice)<=0.20):
-                stable20counter += 1
-            else:
+        for ii in range(stable10counter+1, len(stockdata_list)):
+            minprice = min(closingprice_list[:ii])
+            maxprice = max(closingprice_list[:ii])
+            if((maxprice-minprice)>0.2*maxprice):
+                stable20counter = ii-1
                 break
         return stable5counter, stable10counter, stable20counter
 
@@ -446,19 +468,24 @@ def EHBF_Analyze_pipeline(filename):
         std20 = np.std([float(item[3]) for item in stockdata_list[:min(20, len(stockdata_list))]])/np.mean([float(item[3]) for item in stockdata_list[:min(20, len(stockdata_list))]])
         return std10, std20
 
+    def amplitude_Analyze(stockdata_list):
+        amplitude10 = np.mean([((float(item[4])-float(item[5]))/float(item[7])*100) for item in stockdata_list[:10]])
+        amplitude20 = np.mean([((float(item[4])-float(item[5]))/float(item[7])*100) for item in stockdata_list[:10]])
+        return amplitude10, amplitude20
+
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
+    closingprice = float(stockdata_list[0][3])
     maxprice = max([float(item[3]) for item in stockdata_list[:100]])
     minprice = min([float(item[3]) for item in stockdata_list[:100]])
-    closingprice = float(stockdata_list[0][3])
     reboundrange = (closingprice-minprice)/(maxprice-minprice)*100
     stable5counter, stable10counter, stable20counter = stable_Analyze(stockdata_list)
     EMA6_range, EMA12_range, EMA24_range = EMA_Analyze(stockdata_list)
     std10, std20 = std_Analyze(stockdata_list)
-    earnratio = earnratio_Analyze(stockdata_list[:500])
+    pressureratio, supportratio, earnratio = earnratio_Analyze(stockdata_list[:500])
+    amplitude10, amplitude20 = amplitude_Analyze(stockdata_list)
     drop30_range = (float(stockdata_list[0][3])-float(stockdata_list[min(30,len(stockdata_list)-1)][3]))/float(stockdata_list[min(30,len(stockdata_list)-1)][3])*100
-    amplitude6 = np.mean([((float(item[4])-float(item[5]))/float(item[7])*100) for item in stockdata_list[:6]])
-    return [stockinfo, stockdata_list[0][9], reboundrange, earnratio, len(stockdata_list), std10, std20, stable5counter, stable10counter, stable20counter, amplitude6, EMA6_range, EMA12_range, EMA24_range, drop30_range]
+    return [stockinfo, stockdata_list[0][9], reboundrange, len(stockdata_list), earnratio, pressureratio, supportratio, std10, std20, stable5counter, stable10counter, stable20counter, amplitude10, amplitude20, EMA6_range, EMA12_range, EMA24_range, drop30_range]
 
 
 def drop_Model_Select():
@@ -1186,7 +1213,7 @@ def EMV_Model_Select_pipeline(filename):
     EMVDIFF_list = [0]
     if(len(stockdata_list)<100):
         return [], []
-    for ii in range(min(200, len(stockdata_list)-1)):
+    for ii in reversed(range(min(200, len(stockdata_list)-1))):
         MID = (float(stockdata_list[ii][3])+float(stockdata_list[ii][4])+float(stockdata_list[ii][5]))/3 - (float(stockdata_list[ii-1][3])+float(stockdata_list[ii-1][4])+float(stockdata_list[ii-1][5]))/3
         BRO = float(stockdata_list[ii][10])/max(float(stockdata_list[ii][4])-float(stockdata_list[ii][5]), 0.01)
         EM = MID/BRO
@@ -1496,10 +1523,10 @@ def MACDDIFFLong_Model_Select_pipeline(filename):
 
 def obv_Model_Select():
 # OBV模型+多空净额比率法修正+MACD 模型 & DIFF 模型
-    resultfile_path1 = os.path.join(resultdata_path, "obv_Model_Select_Result.csv")
-    title1 = ["股票名称", "当日涨跌幅", "估算obvMACD贯穿天数", "obvMACD下方天数", "上穿前总跌幅", "5日obv", "10日obv", "30日obv"]
+    resultfile_path1 = os.path.join(resultdata_path, "obvMACD_Model_Select_Result.csv")
     resultfile_path2 = os.path.join(resultdata_path, "obvDIFF_Model_Select_Result.csv")
-    title2 = ["股票名称", "当日涨跌幅", "估算obvMACD贯穿天数", "obvMACD下方天数", "上穿前总跌幅", "5日obv", "10日obv", "30日obv"]
+    title1 = ["股票名称", "当日涨跌幅", "估算obvMACD贯穿天数", "obvMACD下方天数", "上穿前总跌幅", "5日obv", "10日obv", "30日obv"]
+    title2 = ["股票名称", "当日涨跌幅", "估算obvDIFF贯穿天数", "obvDIFF下方天数", "上穿前总跌幅", "5日obv", "10日obv", "30日obv"]
     resultdata_list1 = []
     resultdata_list2 = []
     for filename in os.listdir(stockdata_path):
@@ -1510,9 +1537,9 @@ def obv_Model_Select():
     write_csvfile(resultfile_path2, title2, resultdata_list2)
 def obv_Model_Select_par():
     resultfile_path1 = os.path.join(resultdata_path, "obvMACD_Model_Select_Result.csv")
-    title1 = ["股票名称", "当日涨跌幅", "估算obvMACD贯穿天数", "obvMACD下方天数", "上穿前总跌幅", "5日obv", "10日obv", "30日obv"]
     resultfile_path2 = os.path.join(resultdata_path, "obvDIFF_Model_Select_Result.csv")
-    title2 = ["股票名称", "当日涨跌幅", "估算obvMACD贯穿天数", "obvMACD下方天数", "上穿前总跌幅", "5日obv", "10日obv", "30日obv"]
+    title1 = ["股票名称", "当日涨跌幅", "估算obvMACD贯穿天数", "obvMACD下方天数", "上穿前总跌幅", "5日obv", "10日obv", "30日obv"]
+    title2 = ["股票名称", "当日涨跌幅", "估算obvDIFF贯穿天数", "obvDIFF下方天数", "上穿前总跌幅", "5日obv", "10日obv", "30日obv"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(obv_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -1690,7 +1717,7 @@ def lagging_Model_Select_pipeline(filename):
             break
     stock_range = (float(comdata_list[0][1])-float(comdata_list[lagging_counter][1]))/float(comdata_list[lagging_counter][1])*100
     com_range = (float(comdata_list[0][3])-float(comdata_list[lagging_counter][3]))/float(comdata_list[lagging_counter][3])*100
-    lagging_range = stock_range - com_range
+    lagging_range = com_range - stock_range
     lagging30_counter, lagging30_range = lagging_calc(comdata_list, 30)
     lagging60_counter, lagging60_range = lagging_calc(comdata_list, 60)
     lagging100_counter, lagging100_range = lagging_calc(comdata_list, 100)
@@ -1765,7 +1792,7 @@ def AHCom_Model_Select():
                             break
                     stock_range = (float(comdata_list[0][1])-float(comdata_list[lagging_counter][1]))/float(comdata_list[lagging_counter][1])*100
                     com_range = (float(comdata_list[0][3])-float(comdata_list[lagging_counter][3]))/float(comdata_list[lagging_counter][3])*100
-                    lagging_range = stock_range - com_range
+                    lagging_range = com_range - stock_range
                     lagging30_counter, lagging30_range = lagging_calc(comdata_list, 30)
                     lagging60_counter, lagging60_range = lagging_calc(comdata_list, 60)
                     lagging100_counter, lagging100_range = lagging_calc(comdata_list, 100)
@@ -1844,7 +1871,7 @@ def ABCom_Model_Select():
                             break
                     stock_range = (float(comdata_list[0][1])-float(comdata_list[lagging_counter][1]))/float(comdata_list[lagging_counter][1])*100
                     com_range = (float(comdata_list[0][3])-float(comdata_list[lagging_counter][3]))/float(comdata_list[lagging_counter][3])*100
-                    lagging_range = stock_range - com_range
+                    lagging_range = com_range - stock_range 
                     lagging30_counter, lagging30_range = lagging_calc(comdata_list, 30)
                     lagging60_counter, lagging60_range = lagging_calc(comdata_list, 60)
                     lagging100_counter, lagging100_range = lagging_calc(comdata_list, 100)
@@ -1901,6 +1928,11 @@ def margin_Model_Select():
                     margin_df=tspro.margin_detail(ts_code=gen_tscode(marginData_list[ii][0][-6:]), start_date=start_time, end_date=end_time)
                     margin_df = margin_df[["trade_date", "ts_code", "rzye", "rqye", "rzmre", "rqyl", "rzche", "rqchl", "rqmcl", "rzrqye"]]
                     margin_list = margin_df.values.tolist()
+                    for jj in reversed(range(len(margin_list))):
+                        if(np.isnan(margin_list[jj][2:]).any()):
+                            margin_list.pop(jj)
+                        else:
+                            margin_list[jj][0] = margin_list[jj][0][0:4]+'-'+margin_list[jj][0][4:6]+'-'+margin_list[jj][0][6:8]
                     write_csvfile(os.path.join(margindata_path, marginData_list[ii][0]+'.csv'), margin_title, margin_list)
                     time.sleep(1)
                 except Exception as e:
@@ -1945,9 +1977,19 @@ def margin_Model_Select():
                         rzjyerebound_ratio = abs(rzjyerebound_range/rzjyefail_range)
                     else:
                         rzjyerebound_ratio = 100
+                    closingprice = float(stockdata_list[0][3])
                     minprice = float(stockdata_list[minoffset][3])
                     maxprice = float(stockdata_list[maxoffset][3])
-                    closingprice = float(stockdata_list[0][3])
+                    for ii in range(len(stockdata_list)):
+                        if(stockdata_list[ii][0]<=margin_list[minoffset][0]):
+                            minprice = float(stockdata_list[ii][3])
+#                            minoffset = ii
+                            break
+                    for ii in range(ii, len(stockdata_list)):
+                        if(stockdata_list[ii][0]<=margin_list[maxoffset][0]):
+                            maxprice = float(stockdata_list[ii][3])
+#                            maxoffset = ii
+                            break
                     pricefail_range = (minprice-maxprice)/maxprice*100
                     pricerebound_range = (closingprice-minprice)/maxprice*100
                     pricerebound_ratio = 0
