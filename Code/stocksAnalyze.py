@@ -408,7 +408,6 @@ def EHBF_Analyze_pipeline(filename):
         EMA24_range = (closingprice - EMA24) / EMA24 * 100
         return EMA6_range, EMA12_range, EMA24_range
 
-
     def earnratio_Analyze(stockdata_list):
         obv_dict = {}
         closingprice = float(stockdata_list[0][3])
@@ -425,7 +424,7 @@ def EHBF_Analyze_pipeline(filename):
                 obv_dict[price] += aveobv
         obv_sum = sum(obv_dict.values())
         supportobv = 0
-        for price in [item/100 for item in range(round(max(closingprice*0.9, lowerprice)*100), round(closingprice*100))];
+        for price in [item/100 for item in range(round(max(closingprice*0.9,lowerprice)*100), round(closingprice*100))]:
             supportobv += obv_dict[price]
         supportratio = supportobv/obv_sum
         pressureobv = 0
@@ -440,26 +439,26 @@ def EHBF_Analyze_pipeline(filename):
     
     def stable_Analyze(stockdata_list):
         closingprice_list = [float(item[3]) for item in stockdata_list]
-        stable5counter = 0
-        stable10counter = 0
-        stable20counter = 0
-        for ii in range(2, len(stockdata_list)):
-            minprice = min(closingprice_list[:ii])
-            maxprice = max(closingprice_list[:ii])
+        stable5counter = len(stockdata_list)
+        stable10counter = len(stockdata_list)
+        stable20counter = len(stockdata_list)
+        for ii in range(1, len(stockdata_list)):
+            minprice = min(closingprice_list[:ii+1])
+            maxprice = max(closingprice_list[:ii+1])
             if((maxprice-minprice)>0.05*maxprice):
-                stable5counter = ii-1
+                stable5counter = ii
                 break
-        for ii in range(stable5counter+1, len(stockdata_list)):
-            minprice = min(closingprice_list[:ii])
-            maxprice = max(closingprice_list[:ii])
+        for ii in range(stable5counter, len(stockdata_list)):
+            minprice = min(closingprice_list[:ii+1])
+            maxprice = max(closingprice_list[:ii+1])
             if((maxprice-minprice)>0.1*maxprice):
-                stable10counter = ii-1
+                stable10counter = ii
                 break
-        for ii in range(stable10counter+1, len(stockdata_list)):
-            minprice = min(closingprice_list[:ii])
-            maxprice = max(closingprice_list[:ii])
+        for ii in range(stable10counter, len(stockdata_list)):
+            minprice = min(closingprice_list[:ii+1])
+            maxprice = max(closingprice_list[:ii+1])
             if((maxprice-minprice)>0.2*maxprice):
-                stable20counter = ii-1
+                stable20counter = ii
                 break
         return stable5counter, stable10counter, stable20counter
 
