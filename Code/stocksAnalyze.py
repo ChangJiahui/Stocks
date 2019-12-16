@@ -396,10 +396,11 @@ def EHBF_Analyze_par():
 def EHBF_Analyze_pipeline(filename):
     def EMA_Analyze(stockdata_list):
         closingprice = float(stockdata_list[0][3])
+        perioddaynum = min(100, len(stockdata_list))
         EMA6 = 0
         EMA12 = 0
         EMA24 = 0
-        for ii in reversed(range(min(100, len(stockdata_list)))):
+        for ii in reversed(range(perioddaynum)):
             EMA6 = 2/7*float(stockdata_list[ii][3]) + 5/7*EMA6
             EMA12 = 2/13*float(stockdata_list[ii][3]) + 11/13*EMA12
             EMA24 = 2/25*float(stockdata_list[ii][3]) + 23/25*EMA24
@@ -1177,10 +1178,10 @@ def MACDDIFF_Model_Select_pipeline(filename):
 
 
 def EMV_Model_Select():
-# EMV 模型
-    resultfile_path1 = os.path.join(resultdata_path, "EMVMACD_Model_Select_Result.csv")
+# EMV 模型 (40,16) & 移动平均 EMVDIFF 模型
+    resultfile_path1 = os.path.join(resultdata_path, "EMVDIFF_Model_Select_Result.csv")
     resultfile_path2 = os.path.join(resultdata_path, "EMV_Model_Select_Result.csv")
-    title1 = ["股票名称", "当日涨跌幅", "估算EMV金叉天数", "EMV下方天数", "上穿前总跌幅", "EMV比例", "EMV斜率", "百日位置(%)", "5日总涨跌幅", "10日总涨跌幅", "30日总涨跌幅"]
+    title1 = ["股票名称", "当日涨跌幅", "估算EMVDIFF金叉天数", "EMVDIFF下方天数", "上穿前总跌幅", "EMV比例", "EMV斜率", "百日位置(%)", "5日总涨跌幅", "10日总涨跌幅", "30日总涨跌幅"]
     title2 = ["股票名称", "当日涨跌幅", "估算EMV贯穿天数", "EMV下方天数", "上穿前总跌幅", "EMV比例", "EMV斜率", "百日位置(%)", "5日总涨跌幅", "10日总涨跌幅", "30日总涨跌幅"]
     resultdata_list1 = []
     resultdata_list2 = []
@@ -1191,9 +1192,9 @@ def EMV_Model_Select():
     write_csvfile(resultfile_path1, title1, resultdata_list1)
     write_csvfile(resultfile_path2, title2, resultdata_list2)
 def EMV_Model_Select_par():
-    resultfile_path1 = os.path.join(resultdata_path, "EMVMACD_Model_Select_Result.csv")
+    resultfile_path1 = os.path.join(resultdata_path, "EMVDIFF_Model_Select_Result.csv")
     resultfile_path2 = os.path.join(resultdata_path, "EMV_Model_Select_Result.csv")
-    title1 = ["股票名称", "当日涨跌幅", "估算EMV金叉天数", "EMV下方天数", "上穿前总跌幅", "EMV比例", "EMV斜率", "百日位置(%)", "5日总涨跌幅", "10日总涨跌幅", "30日总涨跌幅"]
+    title1 = ["股票名称", "当日涨跌幅", "估算EMVDIFF金叉天数", "EMVDIFF下方天数", "上穿前总跌幅", "EMV比例", "EMV斜率", "百日位置(%)", "5日总涨跌幅", "10日总涨跌幅", "30日总涨跌幅"]
     title2 = ["股票名称", "当日涨跌幅", "估算EMV贯穿天数", "EMV下方天数", "上穿前总跌幅", "EMV比例", "EMV斜率", "百日位置(%)", "5日总涨跌幅", "10日总涨跌幅", "30日总涨跌幅"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(EMV_Model_Select_pipeline, os.listdir(stockdata_path))
@@ -1212,12 +1213,12 @@ def EMV_Model_Select_pipeline(filename):
     EMVDIFF_list = [0]
     if(len(stockdata_list)<100):
         return [], []
-    for ii in reversed(range(min(200, len(stockdata_list)-1))):
-        MID = (float(stockdata_list[ii][3])+float(stockdata_list[ii][4])+float(stockdata_list[ii][5]))/3 - (float(stockdata_list[ii-1][3])+float(stockdata_list[ii-1][4])+float(stockdata_list[ii-1][5]))/3
-        BRO = float(stockdata_list[ii][10])/max(float(stockdata_list[ii][4])-float(stockdata_list[ii][5]), 0.01)
-        EM = MID/BRO
-        EMV = EMV_list[-1]*12/14 + EM*2/14
-        MAEMV = MAEMV_list[-1]*7/9 + EMV*2/9
+    for ii in reversed(range(min(500, len(stockdata_list)-1))):
+        MID = (float(stockdata_list[ii][3])+float(stockdata_list[ii][4])+float(stockdata_list[ii][5]))/3 - (float(stockdata_list[ii+1][3])+float(stockdata_list[ii+1][4])+float(stockdata_list[ii+1][5]))/3
+        BRO = float(stockdata_list[ii][4])-float(stockdata_list[ii][5])
+        EM = MID*BRO/float(stockdata_list[ii][10])
+        EMV = EMV_list[-1]*39/41 + EM*2/41
+        MAEMV = MAEMV_list[-1]*15/17 + EMV*2/17
         EMVDIFF = EMV-MAEMV
         EMV_list.append(EMV)
         MAEMV_list.append(MAEMV)
@@ -1231,15 +1232,15 @@ def EMV_Model_Select_pipeline(filename):
                 break
         EMV_range = (float(stockdata_list[0][3])-float(stockdata_list[EMVDIFF_counter-1][3]))/float(stockdata_list[EMVDIFF_counter-1][3])*100
         EMV_predict = math.ceil(EMVDIFF_list[-1]/(EMVDIFF_list[-2]-EMVDIFF_list[-1]))
-        EMV_ratio = EMV_list[-1]/(float(stockdata_list[0][3])**2)
-        EMV_slope = (EMV_list[-1]-EMV_list[-2])/(float(stockdata_list[0][3])**2)
+        EMV_ratio = EMV_list[-1]/((float(stockdata_list[0][3])**2)*float(stockdata_list[0][10]))
+        EMV_slope = (EMV_list[-1]-EMV_list[-2])/((float(stockdata_list[0][3])**2)*float(stockdata_list[0][10]))
         maxprice = max([float(item[3]) for item in stockdata_list[:min(100, len(stockdata_list))]])
         minprice = min([float(item[3]) for item in stockdata_list[:min(100, len(stockdata_list))]])
         reboundrange = (closingprice-minprice)/(maxprice-minprice)*100
         drop5_range = (float(stockdata_list[0][3])-float(stockdata_list[min(len(stockdata_list)-1, 5)][3]))/float(stockdata_list[min(len(stockdata_list)-1, 5)][3])*100
         drop10_range = (float(stockdata_list[0][3])-float(stockdata_list[min(len(stockdata_list)-1, 10)][3]))/float(stockdata_list[min(len(stockdata_list)-1, 10)][3])*100
         drop30_range = (float(stockdata_list[0][3])-float(stockdata_list[min(len(stockdata_list)-1, 30)][3]))/float(stockdata_list[min(len(stockdata_list)-1, 30)][3])*100
-        EMVMACD_result = [stockinfo, stockdata_list[0][9], EMV_predict, EMVDIFF_counter, EMV_ratio, EMV_range, EMV_slope, reboundrange, drop5_range, drop10_range, drop30_range]
+        EMVMACD_result = [stockinfo, stockdata_list[0][9], EMV_predict, EMVDIFF_counter, EMV_range, EMV_ratio, EMV_slope, reboundrange, drop5_range, drop10_range, drop30_range]
     if((EMV_list[-2]<0) and (EMV_list[-1]>EMV_list[-2])):
         EMV_counter = 1
         for ii in reversed(range(len(EMV_list)-1)):
@@ -1249,24 +1250,24 @@ def EMV_Model_Select_pipeline(filename):
                 break
         EMV_range = (float(stockdata_list[0][3])-float(stockdata_list[EMV_counter-1][3]))/float(stockdata_list[EMV_counter-1][3])*100
         EMV_predict = math.ceil(EMV_list[-1]/(EMV_list[-2]-EMV_list[-1]))
-        EMV_ratio = EMV_list[-1]/(float(stockdata_list[0][3])**2)
-        EMV_slope = (EMV_list[-1]-EMV_list[-2])/(float(stockdata_list[0][3])**2)
+        EMV_ratio = EMV_list[-1]/((float(stockdata_list[0][3])**2)*float(stockdata_list[0][10]))
+        EMV_slope = (EMV_list[-1]-EMV_list[-2])/((float(stockdata_list[0][3])**2)*float(stockdata_list[0][10]))
         maxprice = max([float(item[3]) for item in stockdata_list[:min(100, len(stockdata_list))]])
         minprice = min([float(item[3]) for item in stockdata_list[:min(100, len(stockdata_list))]])
         reboundrange = (closingprice-minprice)/(maxprice-minprice)*100
         drop5_range = (float(stockdata_list[0][3])-float(stockdata_list[min(len(stockdata_list)-1, 5)][3]))/float(stockdata_list[min(len(stockdata_list)-1, 5)][3])*100
         drop10_range = (float(stockdata_list[0][3])-float(stockdata_list[min(len(stockdata_list)-1, 10)][3]))/float(stockdata_list[min(len(stockdata_list)-1, 10)][3])*100
         drop30_range = (float(stockdata_list[0][3])-float(stockdata_list[min(len(stockdata_list)-1, 30)][3]))/float(stockdata_list[min(len(stockdata_list)-1, 30)][3])*100
-        EMV_result = [stockinfo, stockdata_list[0][9], EMV_predict, EMV_counter, EMV_ratio, EMV_range, EMV_slope, reboundrange, drop5_range, drop10_range, drop30_range]        
+        EMV_result = [stockinfo, stockdata_list[0][9], EMV_predict, EMV_counter, EMV_range, EMV_ratio, EMV_slope, reboundrange, drop5_range, drop10_range, drop30_range]        
     return EMVMACD_result, EMV_result
 
 
 def DMI_Model_Select():
-# DMI 模型
+# DMI 模型 & ADX 模型
     resultfile_path1 = os.path.join(resultdata_path, "DMI_Model_Select_Result.csv")
     resultfile_path2 = os.path.join(resultdata_path, "ADX_Model_Select_Result.csv")
     title1 = ["股票名称", "当日涨跌幅", "估算DMI金叉天数", "DMI下方天数", "上穿前总跌幅", "EMAPDI", "EMAMDI", "EMADX", "DMI斜率", "百日位置(%)"]
-    title2 = ["股票名称", "当日涨跌幅", "EMAPDI", "EMAMDI", "EMADX", "DMI斜率", "百日位置(%)", "5日总涨跌幅", "10日总涨跌幅", "30日总涨跌幅"]
+    title2 = ["股票名称", "当日涨跌幅", "ADX下降天数", "上穿前总跌幅", "EMAPDI", "EMAMDI", "EMADX", "DMI斜率", "百日位置(%)", "5日总涨跌幅", "10日总涨跌幅", "30日总涨跌幅"]
     resultdata_list1 = []
     resultdata_list2 = []
     for filename in os.listdir(stockdata_path):
@@ -1279,7 +1280,7 @@ def DMI_Model_Select_par():
     resultfile_path1 = os.path.join(resultdata_path, "DMI_Model_Select_Result.csv")
     resultfile_path2 = os.path.join(resultdata_path, "ADX_Model_Select_Result.csv")
     title1 = ["股票名称", "当日涨跌幅", "估算DMI金叉天数", "DMI下方天数", "上穿前总跌幅", "EMAPDI", "EMAMDI", "EMADX", "DMI斜率", "百日位置(%)"]
-    title2 = ["股票名称", "当日涨跌幅", "EMAPDI", "EMAMDI", "EMADX", "DMI斜率", "百日位置(%)", "5日总涨跌幅", "10日总涨跌幅", "30日总涨跌幅"]
+    title2 = ["股票名称", "当日涨跌幅", "ADX下降天数", "上穿前总跌幅", "EMAPDI", "EMAMDI", "EMADX", "DMI斜率", "百日位置(%)", "5日总涨跌幅", "10日总涨跌幅", "30日总涨跌幅"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(DMI_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -1355,14 +1356,21 @@ def DMI_Model_Select_pipeline(filename):
         reboundrange = (closingprice-minprice)/(maxprice-minprice)*100
         DMI_result = [stockinfo, stockdata_list[0][9], DMI_predict, DMI_counter, DMI_range, PDI_list[-1], MDI_list[-1], MADX_list[-1], DMI_slope, reboundrange]
     if((MADX_list[-2]<MADX_list[-3]) and (MADX_list[-2]<MADX_list[-1])):
+        ADX_counter = 1
+        for ii in reversed(range(len(MADX_list)-2)):
+            if(MADX_list[ii]>MADX_list[ii+1]):
+                ADX_counter += 1
+            else:
+                break
         DMI_slope = (DMI_list[-1]-DMI_list[-2])
+        ADX_range = (float(stockdata_list[0][3])-float(stockdata_list[ADX_counter-1][3]))/float(stockdata_list[ADX_counter-1][3])*100
         maxprice = max([float(item[3]) for item in stockdata_list[:min(100, len(stockdata_list))]])
         minprice = min([float(item[3]) for item in stockdata_list[:min(100, len(stockdata_list))]])
         reboundrange = (closingprice-minprice)/(maxprice-minprice)*100
         drop5_range = (float(stockdata_list[0][3])-float(stockdata_list[min(len(stockdata_list)-1, 5)][3]))/float(stockdata_list[min(len(stockdata_list)-1, 5)][3])*100
         drop10_range = (float(stockdata_list[0][3])-float(stockdata_list[min(len(stockdata_list)-1, 10)][3]))/float(stockdata_list[min(len(stockdata_list)-1, 10)][3])*100
         drop30_range = (float(stockdata_list[0][3])-float(stockdata_list[min(len(stockdata_list)-1, 30)][3]))/float(stockdata_list[min(len(stockdata_list)-1, 30)][3])*100
-        ADX_result = [stockinfo, stockdata_list[0][9], PDI_list[-1], MDI_list[-1], MADX_list[-1], DMI_slope, reboundrange, drop5_range, drop10_range, drop30_range]
+        ADX_result = [stockinfo, stockdata_list[0][9], ADX_counter, ADX_range, PDI_list[-1], MDI_list[-1], MADX_list[-1], DMI_slope, reboundrange, drop5_range, drop10_range, drop30_range]
     return DMI_result, ADX_result
 
 
@@ -1753,7 +1761,7 @@ def AHCom_Model_Select():
         return False
 
     resultfile_path = os.path.join(resultdata_path, "AHCom_Model_Select_Result.csv")
-    title = ["股票名称", "股票溢价率", "股票总涨跌幅", "指数总涨跌幅", "股票总滞后幅", "股票滞后天数", "30日总滞后幅", "30日滞后天数", "60日总滞后幅", "60日滞后天数", "100日总滞后幅", "100日滞后天数", "200日总滞后幅", "200日滞后天数", "500日总滞后幅", "500日滞后天数"]
+    title = ["股票名称", "股票溢价率", "A股总涨跌幅", "H股总涨跌幅", "总滞后幅", "总滞后天数", "30日总滞后幅", "30日滞后天数", "60日总滞后幅", "60日滞后天数", "100日总滞后幅", "100日滞后天数", "200日总滞后幅", "200日滞后天数", "500日总滞后幅", "500日滞后天数"]
     resultdata_list = []
     if(get_AHdata()):
         _, AHCom_list = read_csvfile(AHfile_path)
@@ -1765,6 +1773,7 @@ def AHCom_Model_Select():
                 if(str(AHCom_list[ii][2]).zfill(7)==filename.split(".")[0][-7:]):
                     _, HKdata_list = read_csvfile(HKfilename)
                     _, CNdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+                    stockinfo = filename.split(".")[0]
                     offset1 = 0
                     offset2 = 0
                     comdata_list = []
@@ -1797,7 +1806,7 @@ def AHCom_Model_Select():
                     lagging100_counter, lagging100_range = lagging_calc(comdata_list, 100)
                     lagging200_counter, lagging200_range = lagging_calc(comdata_list, 200)
                     lagging500_counter, lagging500_range = lagging_calc(comdata_list, 500)
-                    resultdata_list.append([stockHinfo, A_Hratio, stock_range, com_range, lagging_range, lagging_counter, lagging30_range, lagging30_counter, lagging60_range, lagging60_counter, lagging100_range, lagging100_counter, lagging200_range, lagging200_counter, lagging500_range, lagging500_counter])
+                    resultdata_list.append([stockinfo, A_Hratio, stock_range, com_range, lagging_range, lagging_counter, lagging30_range, lagging30_counter, lagging60_range, lagging60_counter, lagging100_range, lagging100_counter, lagging200_range, lagging200_counter, lagging500_range, lagging500_counter])
                     break
         write_csvfile(resultfile_path, title, resultdata_list)
 
@@ -1831,7 +1840,7 @@ def ABCom_Model_Select():
             return False
 
     resultfile_path = os.path.join(resultdata_path, "ABCom_Model_Select_Result.csv")
-    title = ["股票名称", "股票溢价率", "股票总涨跌幅", "指数总涨跌幅", "股票总滞后幅", "股票滞后天数", "30日总滞后幅", "30日滞后天数", "60日总滞后幅", "60日滞后天数", "100日总滞后幅", "100日滞后天数", "200日总滞后幅", "200日滞后天数", "500日总滞后幅", "500日滞后天数"]
+    title = ["股票名称", "股票溢价率", "A股总涨跌幅", "B股总涨跌幅", "总滞后幅", "总滞后天数", "30日总滞后幅", "30日滞后天数", "60日总滞后幅", "60日滞后天数", "100日总滞后幅", "100日滞后天数", "200日总滞后幅", "200日滞后天数", "500日总滞后幅", "500日滞后天数"]
     resultdata_list = []
     if(get_ABdata()):
         _, ABCom_list = read_csvfile(ABfile_path)
@@ -1844,6 +1853,7 @@ def ABCom_Model_Select():
                 if(str(ABCom_list[ii][2]).zfill(7)==filename.split(".")[0][-7:]):
                     _, Bdata_list = read_csvfile(Bfilename)
                     _, CNdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+                    stockinfo = filename.split(".")[0]
                     offset1 = 0
                     offset2 = 0
                     comdata_list = []
@@ -1876,7 +1886,7 @@ def ABCom_Model_Select():
                     lagging100_counter, lagging100_range = lagging_calc(comdata_list, 100)
                     lagging200_counter, lagging200_range = lagging_calc(comdata_list, 200)
                     lagging500_counter, lagging500_range = lagging_calc(comdata_list, 500)
-                    resultdata_list.append([stockBinfo, A_Bratio, stock_range, com_range, lagging_range, lagging_counter, lagging30_range, lagging30_counter, lagging60_range, lagging60_counter, lagging100_range, lagging100_counter, lagging200_range, lagging200_counter, lagging500_range, lagging500_counter])
+                    resultdata_list.append([stockinfo, A_Bratio, stock_range, com_range, lagging_range, lagging_counter, lagging30_range, lagging30_counter, lagging60_range, lagging60_counter, lagging100_range, lagging100_counter, lagging200_range, lagging200_counter, lagging500_range, lagging500_counter])
                     break
         write_csvfile(resultfile_path, title, resultdata_list)
 
@@ -1954,6 +1964,7 @@ def margin_Model_Select():
                 if(marginData[0][-6:]==filename.split(".")[0][-6:]):
                     _, margin_list = read_csvfile(os.path.join(margindata_path, marginData[0]+'.csv'))
                     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+                    stockinfo = filename.split(".")[0]
                     rzjye_list = [(float(margin_list[ii][2])-float(margin_list[ii][3])) for ii in range(len(margin_list))]
                     perioddaynum = min(len(rzjye_list), 500)
                     minoffset = perioddaynum-1
@@ -1996,7 +2007,7 @@ def margin_Model_Select():
                         pricerebound_ratio = abs(pricerebound_range/pricefail_range)
                     else:
                         pricerebound_ratio = 100
-                    resultdata_list.append([marginData[0], minoffset, (maxoffset-minoffset), maxrzjye, minrzjye, rzjye_list[0], rzjyefail_range, rzjyerebound_range, rzjyerebound_ratio, maxprice, minprice, closingprice, pricefail_range, pricerebound_range, pricerebound_ratio])
+                    resultdata_list.append([stockinfo, minoffset, (maxoffset-minoffset), maxrzjye, minrzjye, rzjye_list[0], rzjyefail_range, rzjyerebound_range, rzjyerebound_ratio, maxprice, minprice, closingprice, pricefail_range, pricerebound_range, pricerebound_ratio])
         write_csvfile(resultfile_path, title, resultdata_list)
 
 
