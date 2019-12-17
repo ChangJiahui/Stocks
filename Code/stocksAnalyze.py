@@ -1057,6 +1057,9 @@ def KDJ_Model_Select_par():
 def KDJ_Model_Select_pipeline(filename):
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
+    perioddaynum = min(100, len(stockdata_list)-9)
+    if(perioddaynum<50):
+        return []
     K_list = [50]
     D_list = [50]
     J_list = [50]
@@ -1065,9 +1068,7 @@ def KDJ_Model_Select_pipeline(filename):
     C9 = 0
     L9 = 0
     H9 = 0
-    if(len(stockdata_list)<50):
-        return []
-    for ii in reversed(range(min(100, len(stockdata_list)-9))):
+    for ii in reversed(range(perioddaynum)):
         C9 = float(stockdata_list[ii][3])
         L9 = min([float(stockdata_list[jj][5]) for jj in range(ii,ii+9)])
         H9 = max([float(stockdata_list[jj][4]) for jj in range(ii,ii+9)])
@@ -1126,6 +1127,9 @@ def MACDDIFF_Model_Select_par():
 def MACDDIFF_Model_Select_pipeline(filename):
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
+    perioddaynum = min(200, len(stockdata_list))
+    if(perioddaynum<100):
+        return [], []
     EMA12 = 0
     EMA26 = 0
     DIFF_list = [0]
@@ -1133,9 +1137,7 @@ def MACDDIFF_Model_Select_pipeline(filename):
     MACD_list = [0]
     MACD_result = []
     DIFF_result = []
-    if(len(stockdata_list)<100):
-        return [], []
-    for ii in reversed(range(min(200, len(stockdata_list)))):
+    for ii in reversed(range(perioddaynum)):
         EMA12 = 11/13*EMA12 + 2/13*float(stockdata_list[ii][3])
         EMA26 = 25/27*EMA26 + 2/27*float(stockdata_list[ii][3])
         DIFF = EMA12 - EMA26
@@ -1206,14 +1208,15 @@ def EMV_Model_Select_pipeline(filename):
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     closingprice = float(stockdata_list[0][3])
+    perioddaynum = min(500, len(stockdata_list)-1)
+    if(perioddaynum<100):
+        return [], []
     EMVMACD_result = []
     EMV_result = []
     EMV_list = [0]
     MAEMV_list = [0]
     EMVDIFF_list = [0]
-    if(len(stockdata_list)<100):
-        return [], []
-    for ii in reversed(range(min(500, len(stockdata_list)-1))):
+    for ii in reversed(range(perioddaynum)):
         MID = (float(stockdata_list[ii][3])+float(stockdata_list[ii][4])+float(stockdata_list[ii][5]))/3 - (float(stockdata_list[ii+1][3])+float(stockdata_list[ii+1][4])+float(stockdata_list[ii+1][5]))/3
         BRO = float(stockdata_list[ii][4])-float(stockdata_list[ii][5])
         EM = MID*BRO/float(stockdata_list[ii][10])
@@ -1291,6 +1294,9 @@ def DMI_Model_Select_pipeline(filename):
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     closingprice = float(stockdata_list[0][3])
+    perioddaynum = min(200, len(stockdata_list)-15)
+    if(perioddaynum<100):
+        return [], []
     DMI_result = []
     ADX_result = []
     PDM_list = []
@@ -1304,9 +1310,7 @@ def DMI_Model_Select_pipeline(filename):
 #    EMADX_list = [50]
 #    EMAPDI_list = [50]
 #    EMAMDI_list = [50]
-    if(len(stockdata_list)<100):
-        return [], []
-    for ii in range(min(200+14, len(stockdata_list)-1)):
+    for ii in range(perioddaynum+14):
         TR = max(abs(float(stockdata_list[ii][4])-float(stockdata_list[ii][5])), abs(float(stockdata_list[ii][4])-float(stockdata_list[ii+1][3])), abs(float(stockdata_list[ii+1][3])-float(stockdata_list[ii][5])))
         PDM = max((float(stockdata_list[ii][4])-float(stockdata_list[ii+1][4])), 0)
         MDM = max((float(stockdata_list[ii+1][5])-float(stockdata_list[ii][5])), 0)
@@ -1320,7 +1324,7 @@ def DMI_Model_Select_pipeline(filename):
         PDM_list.append(PDM)
         MDM_list.append(MDM)
         TR_list.append(TR)
-    for ii in reversed(range(min(200, len(stockdata_list)-15))):
+    for ii in reversed(range(perioddaynum)):
         PDM = sum(PDM_list[ii:ii+14])
         MDM = sum(MDM_list[ii:ii+14])
         TR = sum(TR_list[ii:ii+14])
@@ -1402,6 +1406,9 @@ def MACDDIFFShort_Model_Select_par():
 def MACDDIFFShort_Model_Select_pipeline(filename):
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
+    perioddaynum = min(200, len(stockdata_list))
+    if(perioddaynum<100):
+        return [], []
     EMA6 = 0
     EMA10 = 0
     DIFF_list = [0]
@@ -1409,7 +1416,7 @@ def MACDDIFFShort_Model_Select_pipeline(filename):
     MACD_list = [0]
     MACD_result = []
     DIFF_result = []
-    for ii in reversed(range(min(200, len(stockdata_list)))):
+    for ii in reversed(range(perioddaynum)):
         EMA6 = 5/7*EMA6 + 2/7*float(stockdata_list[ii][3])
         EMA10 = 9/11*EMA10 + 2/11*float(stockdata_list[ii][3])
         DIFF = EMA6 - EMA10
@@ -1479,6 +1486,9 @@ def MACDDIFFLong_Model_Select_par():
 def MACDDIFFLong_Model_Select_pipeline(filename):
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
+    perioddaynum = min(200, len(stockdata_list))
+    if(perioddaynum<100):
+        return [], []
     EMA21 = 0
     EMA34 = 0
     DIFF_list = [0]
@@ -1486,7 +1496,7 @@ def MACDDIFFLong_Model_Select_pipeline(filename):
     MACD_list = [0]
     MACD_result = []
     DIFF_result = []
-    for ii in reversed(range(min(200, len(stockdata_list)))):
+    for ii in reversed(range(perioddaynum)):
         EMA21 = 20/22*EMA21 + 2/22*float(stockdata_list[ii][3])
         EMA34 = 33/35*EMA34 + 2/35*float(stockdata_list[ii][3])
         DIFF = EMA21 - EMA34
@@ -1556,6 +1566,9 @@ def obv_Model_Select_par():
 def obv_Model_Select_pipeline(filename):
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
+    perioddaynum = min(100, len(stockdata_list))
+    if(perioddaynum<100):
+        return [], []
     OBVEMA12 = 0
     OBVEMA26 = 0
     OBV_list = [0]
@@ -1564,7 +1577,7 @@ def obv_Model_Select_pipeline(filename):
     OBVMACD_list = [0]
     OBVMACD_result = []
     OBVDIFF_result = []
-    for ii in reversed(range(min(100, len(stockdata_list)))):
+    for ii in reversed(range(perioddaynum)):
         OBV = float(stockdata_list[ii][10])
         OBVEMA12 = 11/13*OBVEMA12 + 2/13*OBV
         OBVEMA26 = 25/27*OBVEMA26 + 2/27*OBV
@@ -2476,14 +2489,14 @@ def generate_query_pipeline(stockinfo):
 
 def summary_result():
     resultfile_path = os.path.join(resultdata_path, "summary_result.csv")
-    summaryfile_list = ["trend1T5_Model_Select_Result.csv", "trend5T10_Model_Select_Result.csv", "trend10T30_Model_Select_Result.csv", "MACD_Model_Select_Result.csv", "DIFF_Model_Select_Result.csv",
+    selectfile_list = ["trend1T5_Model_Select_Result.csv", "trend5T10_Model_Select_Result.csv", "trend10T30_Model_Select_Result.csv", "MACD_Model_Select_Result.csv", "DIFF_Model_Select_Result.csv",
     "DIFFLong_Model_Select_Result.csv", "MACDLong_Model_Select_Result.csv", "DIFFShort_Model_Select_Result.csv", "MACDShort_Model_Select_Result.csv",
      "KDJ_Model_Select_Result.csv", "DMI_Model_Select_Result.csv", "ADX_Model_Select_Result.csv", "EMV_Model_Select_Result.csv", "EMVMACD_Model_Select_Result.csv",
      "trend1T5Month_Model_Select_Result.csv", "trend5T10Month_Model_Select_Result.csv", "MACDMonth_Model_Select_Result.csv", "DIFFMonth_Model_Select_Result.csv", "KDJMonth_Model_Select_Result.csv"]
-    for ii in reversed(range(len(summaryfile_list))):
-        if(not os.path.exists(os.path.join(resultdata_path, summaryfile_list[ii]))):
-            summaryfile_list.pop(ii)
-    title = ["股票名称", "总和"] + [item.split('_')[0] for item in summaryfile_list]
+    for ii in reversed(range(len(selectfile_list))):
+        if(not os.path.exists(os.path.join(resultdata_path, selectfile_list[ii]))):
+            selectfile_list.pop(ii)
+    title = ["股票名称", "总和"] + [item.split('_')[0] for item in selectfile_list]
     stockinfo_list = []
     with open(stockinfo_file, 'r') as fp:
         stockinfo_list = fp.read().splitlines()
@@ -2516,7 +2529,7 @@ def summary_result_pipeline(stockinfo):
      "trend1T5Month_Model_Select_Result.csv", "trend5T10Month_Model_Select_Result.csv", "MACDMonth_Model_Select_Result.csv", "DIFFMonth_Model_Select_Result.csv", "KDJMonth_Model_Select_Result.csv"]
     for ii in reversed(range(len(selectfile_list))):
         if(not os.path.exists(os.path.join(resultdata_path, selectfile_list[ii]))):
-            summaryfile_list.pop(ii)
+            selectfile_list.pop(ii)
     summary_list = []
     for ii in range(len(selectfile_list)):
         _, selectdata_list = read_csvfile(os.path.join(resultdata_path, selectfile_list[ii]))
