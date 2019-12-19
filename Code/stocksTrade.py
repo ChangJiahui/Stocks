@@ -84,9 +84,9 @@ def trade_analyze():
     def point_Model_Trade_pipeline(tradeitem, stockdata_list):
         maxprice = float(stockdata_list[0][4])
         minprice = float(stockdata_list[0][5])
-        if(maxprice>=tradeitem[11]):
+        if(maxprice>=float(tradeitem[11])):
             return (" 高价格卖出点提示 卖出价格: " + str(tradeitem[11]) + "\n")
-        elif(minprice<=tradeitem[10]):
+        elif(minprice<=float(tradeitem[10])):
             return (" 低价格买入点提示 买入价格: " + str(tradeitem[10]) + "\n")
         else:
             return ""
