@@ -81,12 +81,23 @@ def clear_data():
 
     
 def trade_analyze():
+    def point_Model_Trade_pipeline(tradeitem, stockdata_list):
+        maxprice = float(stockdata_list[0][4])
+        minprice = float(stockdata_list[0][5])
+        if(maxprice>=tradeitem[11]):
+            return (" 高价格卖出点提示 卖出价格: " + str(tradeitem[11]) + "\n")
+        elif(minprice<=tradeitem[10]):
+            return (" 低价格买入点提示 买入价格: " + str(tradeitem[10]) + "\n")
+        else:
+            return ""
+
     def grid_Model_Trade_pipeline(stockLastTradePrice, stockdata_list):
-        closingPrice = float(stockdata_list[0][3])
-        if(closingPrice<stockLastTradePrice*0.95):
-            return (" 跌5% 网格买入信号 买入价格: " + str(round(stockLastTradePrice*0.95,2)) + "\n")
-        elif(closingPrice>stockLastTradePrice*1.03):
+        maxprice = float(stockdata_list[0][4])
+        minprice = float(stockdata_list[0][5])
+        if(maxprice>=stockLastTradePrice*1.03):
             return (" 涨3% 网格卖出信号 卖出价格: " + str(round(stockLastTradePrice*1.03,2)) + "\n")
+        elif(minprice<=stockLastTradePrice*0.95):
+            return (" 跌5% 网格买入信号 买入价格: " + str(round(stockLastTradePrice*0.95,2)) + "\n")
         else:
             return ""
 
@@ -311,6 +322,9 @@ def trade_analyze():
                     trade_list[ii][7] = EHBFitem[2]
         trade_list[ii][8] = round(stockLastTradePrice*0.95,2)
         trade_list[ii][9] = round(stockLastTradePrice*1.03,2)
+        tempstr = point_Model_Trade_pipeline(trade_list[ii], stockdata_list)
+        if(tempstr!=""):
+            resultstr = resultstr + stockinfo + tempstr
         tempstr = grid_Model_Trade_pipeline(stockLastTradePrice, stockdata_list)
         if(tempstr!=""):
             resultstr = resultstr + stockinfo + tempstr

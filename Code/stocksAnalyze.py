@@ -314,7 +314,7 @@ def get_stockdata():
 def EHBF_Analyze():
 # 横盘天数 & 振幅 & EMA & MAOBV & PE & PB
     resultfile_path = os.path.join(resultdata_path, "EHBF_Analyze_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "百日位置(%)", "总交易日", "获利持仓比例", "压力筹码比例", "支撑筹码比例", "10日标准差", "20日标准差", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均10日振幅", "平均20日振幅", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅"]
+    title = ["股票名称", "当日涨跌幅", "历史位置(%)", "总交易日", "获利持仓比例", "压力筹码比例", "支撑筹码比例", "10日标准差", "20日标准差", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均10日振幅", "平均20日振幅", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         resultdata_list.append(EHBF_Analyze_pipeline(filename))
@@ -354,7 +354,7 @@ def EHBF_Analyze():
     write_csvfile(resultfile_path, title, resultdata_list)
 def EHBF_Analyze_par():
     resultfile_path = os.path.join(resultdata_path, "EHBF_Analyze_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "百日位置(%)", "总交易日", "获利持仓比例", "压力筹码比例", "支撑筹码比例", "10日标准差", "20日标准差", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均10日振幅", "平均20日振幅", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅"]
+    title = ["股票名称", "当日涨跌幅", "历史位置(%)", "总交易日", "获利持仓比例", "压力筹码比例", "支撑筹码比例", "10日标准差", "20日标准差", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均10日振幅", "平均20日振幅", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(EHBF_Analyze_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -476,8 +476,9 @@ def EHBF_Analyze_pipeline(filename):
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     closingprice = float(stockdata_list[0][3])
-    maxprice = max([float(item[3]) for item in stockdata_list[:100]])
-    minprice = min([float(item[3]) for item in stockdata_list[:100]])
+    closingprice_list = [float(item[3]) for item in stockdata_list]
+    maxprice = max(closingprice_list)
+    minprice = min(closingprice_list)
     reboundrange = (closingprice-minprice)/(maxprice-minprice)*100
     stable5counter, stable10counter, stable20counter = stable_Analyze(stockdata_list)
     EMA6_range, EMA12_range, EMA24_range = EMA_Analyze(stockdata_list)
