@@ -84,10 +84,10 @@ def trade_analyze():
     def point_Model_Trade_pipeline(tradeitem, stockdata_list):
         maxprice = float(stockdata_list[0][4])
         minprice = float(stockdata_list[0][5])
-        if(maxprice>=float(tradeitem[11])):
-            return (" 高价格卖出点提示 卖出价格: " + str(tradeitem[11]) + "\n")
-        elif(minprice<=float(tradeitem[10])):
-            return (" 低价格买入点提示 买入价格: " + str(tradeitem[10]) + "\n")
+        if(maxprice>=float(tradeitem[11])*0.95):
+            return (" 接近箱体上沿提示 高位价格: " + str(tradeitem[11]) + "\n")
+        elif(minprice<=float(tradeitem[10])*1.05):
+            return (" 接近箱体下沿提示 低位价格: " + str(tradeitem[10]) + "\n")
         else:
             return ""
 
@@ -96,8 +96,8 @@ def trade_analyze():
         minprice = float(stockdata_list[0][5])
         if(maxprice>=stockLastTradePrice*1.03):
             return (" 涨3% 网格卖出信号 卖出价格: " + str(round(stockLastTradePrice*1.03,2)) + "\n")
-        elif(minprice<=stockLastTradePrice*0.95):
-            return (" 跌5% 网格买入信号 买入价格: " + str(round(stockLastTradePrice*0.95,2)) + "\n")
+        elif(minprice<=stockLastTradePrice*0.97):
+            return (" 跌3% 网格买入信号 买入价格: " + str(round(stockLastTradePrice*0.97,2)) + "\n")
         else:
             return ""
 
@@ -310,17 +310,17 @@ def trade_analyze():
     title, trade_list = read_csvfile(accountbook_path)
     for ii in range(len(trade_list)):
         stockinfo = trade_list[ii][0]
-        stockLastTradePrice = float(trade_list[ii][5])
+        stockLastTradePrice = float(trade_list[ii][3])
         filename = os.path.join(stockdata_path, stockinfo+".csv")
         _, stockdata_list = read_csvfile(filename)
-        trade_list[ii][1] = stockdata_list[0][3]
-        trade_list[ii][4] = float(trade_list[ii][1])*float(trade_list[ii][3])
-        trade_list[ii][6] = float(trade_list[ii][1])/float(trade_list[ii][2])-1
+        trade_list[ii][5] = stockdata_list[0][3]
+        trade_list[ii][4] = float(trade_list[ii][1])*float(trade_list[ii][2])
+        trade_list[ii][6] = float(trade_list[ii][5])/float(trade_list[ii][1])-1
         _, EHBFdata_list = read_csvfile(EHBFfile_path)
         for EHBFitem in EHBFdata_list:
                 if(EHBFitem[0]==stockinfo):
                     trade_list[ii][7] = EHBFitem[2]
-        trade_list[ii][8] = round(stockLastTradePrice*0.95,2)
+        trade_list[ii][8] = round(stockLastTradePrice*0.97,2)
         trade_list[ii][9] = round(stockLastTradePrice*1.03,2)
         tempstr = point_Model_Trade_pipeline(trade_list[ii], stockdata_list)
         if(tempstr!=""):
