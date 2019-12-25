@@ -106,7 +106,7 @@ def get_realtimedata(filename):
 def morningfall_select():
     resultfile_path = os.path.join(resultdata_path, "morningfall_select.csv")
     get_realtimedata(noondata_path)
-    title = ["股票名称", "当前涨跌幅", "获利持仓比例", "百日位置(%)", "开盘涨跌幅", "柱线幅度", "下影线幅度", "上影线幅度"]
+    title = ["股票名称", "当前涨跌幅", "获利持仓比例", "历史位置(%)", "开盘涨跌幅", "柱线幅度", "下影线幅度", "上影线幅度"]
     resultdata_list = []
     _, noondata_list = read_csvfile(noondata_path)
     _, EHBFdata_list = read_csvfile(EHBFfile_path)
@@ -121,7 +121,7 @@ def morningfall_select():
             for EHBFitem in EHBFdata_list:
                 if(EHBFitem[0].split('_')[-1][-6:]==item[0]):
                     reboundrange = EHBFitem[2]
-                    earnratio = EHBFitem[3]
+                    earnratio = EHBFitem[4]
             resultdata_list.append([item[1]+"_"+item[0], item[2], earnratio, reboundrange, round(open_range,2), round(cylinder_range,2), round(downshadow_range,2), round(upshadow_range,2)])
     if(resultdata_list):
         write_csvfile(resultfile_path, title, resultdata_list)
@@ -130,7 +130,7 @@ def morningfall_select():
 def afternoonfall_select():
     resultfile_path = os.path.join(resultdata_path, "afternoonfall_select.csv")
     get_realtimedata(nightdata_path)
-    title = ["股票名称", "今日涨跌幅", "获利持仓比例", "百日位置(%)", "上午涨跌幅", "午后涨跌幅", "开盘涨跌幅", "柱线幅度", "下影线幅度", "上影线幅度"]
+    title = ["股票名称", "今日涨跌幅", "获利持仓比例", "历史位置(%)", "上午涨跌幅", "午后涨跌幅", "开盘涨跌幅", "柱线幅度", "下影线幅度", "上影线幅度"]
     resultdata_list = []
     _, nightdata_list = read_csvfile(nightdata_path)
     _, noondata_list = read_csvfile(noondata_path)
@@ -153,7 +153,7 @@ def afternoonfall_select():
             for EHBFitem in EHBFdata_list:
                 if(EHBFitem[0].split('_')[-1][-6:]==nightitem[0]):
                     reboundrange = EHBFitem[2]
-                    earnratio = EHBFitem[3]
+                    earnratio = EHBFitem[4]
             resultdata_list.append([nightitem[1]+"_"+nightitem[0], nightitem[2], earnratio, reboundrange, noon_range, afternoon_range, round(open_range,2), round(cylinder_range,2), round(downshadow_range,2), round(upshadow_range,2)])
     if(resultdata_list):
         write_csvfile(resultfile_path, title, resultdata_list)
@@ -161,7 +161,7 @@ def afternoonfall_select():
 
 def alldayfall_select():
     resultfile_path = os.path.join(resultdata_path, "alldayfall_select.csv")
-    title = ["股票名称", "今日涨跌幅", "获利持仓比例", "百日位置(%)", "开盘涨跌幅", "柱线幅度", "下影线幅度", "上影线幅度"]
+    title = ["股票名称", "今日涨跌幅", "获利持仓比例", "历史位置(%)", "开盘涨跌幅", "柱线幅度", "下影线幅度", "上影线幅度"]
     resultdata_list = []
     _, nightdata_list = read_csvfile(nightdata_path)
     _, EHBFdata_list = read_csvfile(EHBFfile_path)
@@ -176,7 +176,7 @@ def alldayfall_select():
             for EHBFitem in EHBFdata_list:
                 if(EHBFitem[0].split('_')[-1][-6:]==nightitem[0]):
                     reboundrange = EHBFitem[2]
-                    earnratio = EHBFitem[3]
+                    earnratio = EHBFitem[4]
             resultdata_list.append([nightitem[1]+"_"+nightitem[0], nightitem[2], earnratio, reboundrange, round(open_range,2), round(cylinder_range,2), round(downshadow_range,2), round(upshadow_range,2)])
     if(resultdata_list):
         write_csvfile(resultfile_path, title, resultdata_list)

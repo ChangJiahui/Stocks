@@ -191,12 +191,12 @@ def MACDDIFF_Model_Select():
 # MACD 模型 (12,26,9) & 中间量 DIFF 模型
     resultfile_path1 = os.path.join(resultdata_path, "MACD_Model_Select_Result.csv")
     resultfile_path2 = os.path.join(resultdata_path, "DIFF_Model_Select_Result.csv")
-    title1 = ["基金信息", "估算MACD贯穿天数", "MACD下方天数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格",  "MACD平行预测价格", "MACD不变预测价格"]
-    title2 = ["基金信息", "估算DIFF贯穿天数", "DIFF下方天数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF平行预测价格", "DIFF不变预测价格"]
+    title1 = ["基金信息", "估算MACD贯穿天数", "MACD下方天数", "上穿前总跌幅", "MACD斜率", "DEA", "相对DEA比例", "MACD交叉预测涨跌幅", "MACD趋势预测涨跌幅", "MACD平行预测涨跌幅", "百日最低DEA比例", "日期", "百日最低相对DEA比例", "日期"]
+    title2 = ["基金信息", "估算DIFF贯穿天数", "DIFF下方天数", "上穿前总跌幅", "DIFF斜率", "DEA", "相对DEA比例", "DIFF交叉预测涨跌幅", "DIFF趋势预测涨跌幅", "DIFF平行预测涨跌幅", "百日最低DEA比例", "日期", "百日最低相对DEA比例", "日期"]
     resultdata_list1 = []
     resultdata_list2 = []
     for filename in os.listdir(funddata_path):
-        MACD_result, DIFF_result = MACDDIFF_Model_Select_pipeline(filename)
+        MACD_result, DIFF_result = MACDDIFF1_Model_Select_pipeline(filename)
         resultdata_list1.append(MACD_result)
         resultdata_list2.append(DIFF_result)
     write_csvfile(resultfile_path1, title1, resultdata_list1)
@@ -204,63 +204,104 @@ def MACDDIFF_Model_Select():
 def MACDDIFF_Model_Select_par():
     resultfile_path1 = os.path.join(resultdata_path, "MACD_Model_Select_Result.csv")
     resultfile_path2 = os.path.join(resultdata_path, "DIFF_Model_Select_Result.csv")
-    title1 = ["基金信息", "估算MACD贯穿天数", "MACD下方天数", "DEA比例", "上穿前总跌幅", "MACD斜率", "当前价格", "MACD交叉预测价格",  "MACD平行预测价格", "MACD不变预测价格"]
-    title2 = ["基金信息", "估算DIFF贯穿天数", "DIFF下方天数", "DIFF/DEA比例", "DEA比例", "DIFF斜率", "当前价格", "DIFF交叉预测价格", "DIFF平行预测价格", "DIFF不变预测价格"]
+    title1 = ["基金信息", "当日涨跌幅", "估算MACD贯穿天数", "MACD下方天数", "上穿前总跌幅", "MACD斜率", "DEA", "相对DEA比例", "MACD交叉预测涨跌幅", "MACD趋势预测涨跌幅", "MACD平行预测涨跌幅", "百日最低DEA比例", "日期", "百日最低相对DEA比例", "日期"]
+    title2 = ["基金信息", "当日涨跌幅", "估算DIFF贯穿天数", "DIFF下方天数", "上穿前总跌幅", "DIFF斜率", "DEA", "相对DEA比例", "DIFF交叉预测涨跌幅", "DIFF趋势预测涨跌幅", "DIFF平行预测涨跌幅", "百日最低DEA比例", "日期", "百日最低相对DEA比例", "日期"]
     pool = multiprocessing.Pool(4)
-    resultdata_list = pool.map(MACDDIFF_Model_Select_pipeline, os.listdir(funddata_path))
+    resultdata_list = pool.map(MACDDIFF1_Model_Select_pipeline, os.listdir(funddata_path))
     pool.close()
     pool.join()
     write_csvfile(resultfile_path1, title1, [item[0] for item in resultdata_list])
     write_csvfile(resultfile_path2, title2, [item[1] for item in resultdata_list])
-def MACDDIFF_Model_Select_pipeline(filename):
+def MACDDIFF1_Model_Select_pipeline(filename):
+    return MACDDIFF_Model_Select_pipeline(filename, 12, 26, 9)
+def MACDDIFF_Model_Select_pipeline(filename, N1, N2, N3):
     _, funddata_list = read_csvfile(os.path.join(funddata_path, filename))
     fundinfo = filename.split(".")[0]
-    EMA12 = 0
-    EMA26 = 0
+    closingprice = float(funddata_list[0][4])
+    perioddaynum = min(400, len(stockdata_list)-1)
+    if(perioddaynum<200):
+        return [], []
+    closingprice_list = [float(item[4]) for item in funddata_list[:perioddaynum+1]]
+    EMA1 = 0
+    EMA2 = 0
+    EMA1_list = []
+    EMA2_list = []
     DIFF_list = [0]
-    DEA9_list = [0]
+    DEA_list = [0]
+    DEAratio_list = [0]
     MACD_list = [0]
     MACD_result = []
     DIFF_result = []
-    for ii in reversed(range(min(200, len(funddata_list)))):
-        EMA12 = 11/13*EMA12 + 2/13*float(funddata_list[ii][4])
-        EMA26 = 25/27*EMA26 + 2/27*float(funddata_list[ii][4])
-        DIFF = EMA12 - EMA26
-        DEA9 = 8/10*DEA9_list[-1] + 2/10*DIFF
-        MACD = (DIFF-DEA9)*2
-        DIFF_list.append(DIFF)
-        DEA9_list.append(DEA9)
-        MACD_list.append(MACD)
-    if((MACD_list[-2]<0) and (MACD_list[-1]>MACD_list[-2]) and (DEA9_list[-2]<0)):
-        MACD_counter = 1
-        for ii in reversed(range(len(MACD_list)-1)):
-            if((MACD_list[ii]<0) or (DIFF_list[ii]<0)):
-                MACD_counter+=1
+    for ii in reversed(range(perioddaynum)):
+        EMA1 = (N1-1)/(N1+1)*EMA1 + 2/(N1+1)*closingprice_list[ii]
+        EMA2= (N2-1)/(N2+1)*EMA2 + 2/(N2+1)*closingprice_list[ii]
+        DIFF = EMA1 - EMA2
+        DEA = (N3-1)/(N3+1)*DEA_list[0] + 2/(N3+1)*DIFF
+        DEAratio = DEA/closingprice_list[ii]
+        MACD = (DIFF-DEA)*2
+        EMA1_list.insert(0, EMA1)
+        EMA2_list.insert(0, EMA2)
+        DIFF_list.insert(0, DIFF)
+        DEA_list.insert(0, DEA)
+        DEAratio_list.insert(0, DEAratio)
+        MACD_list.insert(0, MACD)
+    if((MACD_list[1]<0) and (MACD_list[0]>MACD_list[1]) and (DEA_list[1]<0)):
+        model_counter = 1
+        for ii in range(1, perioddaynum):
+            if(MACD_list[ii]<0):
+                model_counter+=1
             else:
                 break
-        MACD_range = (float(funddata_list[0][4])-float(funddata_list[MACD_counter-1][4]))/float(funddata_list[MACD_counter-1][4])*100
-        MACD_predict = math.ceil(MACD_list[-1]/(MACD_list[-2]-MACD_list[-1]))
-        cross_price = (DEA9_list[-1]-11/13*EMA12+25/27*EMA26)/(2/13-2/27)
-        slope_price = ((5/8*(MACD_list[-1]*2-MACD_list[-2])+DEA9_list[-1]-11/13*EMA12+25/27*EMA26)/(2/13-2/27))
-        parallel_price = (5/8*MACD+DEA9_list[-1]-11/13*EMA12+25/27*EMA26)/(2/13-2/27)
-        MACD_slope = (MACD_list[-1]-MACD_list[-2])/float(funddata_list[0][4])
-        DEA_ratio = DEA9_list[-1]/float(funddata_list[0][4])
-        MACD_result = [fundinfo, MACD_predict, MACD_counter, DEA_ratio, MACD_range, MACD_slope, funddata_list[0][4], round(cross_price,2), round(slope_price,2), round(parallel_price,2)]
-    if((DIFF_list[-2]<0) and (DIFF_list[-1]>DIFF_list[-2])):
-        DIFF_counter = 1
-        for ii in reversed(range(len(DIFF_list)-1)):
+        model_range = (closingprice/closingprice_list[model_counter]-1)*100
+        model_predict = math.ceil(MACD_list[0]/(MACD_list[1]-MACD_list[0]))
+        model_slope = (MACD_list[0]-MACD_list[1])/closingprice
+# Solve Function (DIFF(new)-DEA(new))*2 = MACD (i.e. 0, MACD_list[0], 2*MACD_list[0]-MACD_list[1])
+# DIFF(new)-((N3-1)/(N3+1)*DEA_list[0]+2/(N3+1)*DIFF(new)) = MACD/2
+# (N3-1)/(N3+1)*(DIFF(new)*DEA_list[0]) = MACD/2
+# (N3-1)/(N3+1)*(EMA1(new)-EMA2(new)-DEA_list[0]) = MACD/2
+# (N3-1)/(N3+1)*(((N1-1)/(N1+1)*EMA1_list[0]+2/(N1+1)*x)-((N2-1)/(N2+1)*EMA2_list[0]+2/(N2+1)*x)-DEA_list[0]) = MACD/2
+# ((N1-1)/(N1+1)*EMA1_list[0]+2/(N1+1)*x)-((N2-1)/(N2+1)*EMA2_list[0]+2/(N2+1)*x)-DEA_list[0] = MACD/2*(N3+1)/(N3-1)
+# x =  (MACD/2*(N3+1)/(N3-1)+DEA_list[0]+(N2-1)/(N2+1)*EMA2_list[0]-(N1-1)/(N1+1)*EMA1_list[0])/(2/(N1+1)-2/(N2+1))
+        cross_price = (DEA_list[0]+(N2-1)/(N2+1)*EMA2_list[0]-(N1-1)/(N1+1)*EMA1_list[0])/(2/(N1+1)-2/(N2+1))
+        cross_range = (cross_price/closingprice-1)*100
+        trend_price = ((2*MACD_list[0]-MACD_list[1])/2*(N3+1)/(N3-1)+DEA_list[0]+(N2-1)/(N2+1)*EMA2_list[0]-(N1-1)/(N1+1)*EMA1_list[0])/(2/(N1+1)-2/(N2+1))
+        trend_range = (trend_price/closingprice-1)*100
+        parallel_price = (MACD_list[0]/2*(N3+1)/(N3-1)+DEA_list[0]+(N2-1)/(N2+1)*EMA2_list[0]-(N1-1)/(N1+1)*EMA1_list[0])/(2/(N1+1)-2/(N2+1))
+        parallel_range = (parallel_price/closingprice-1)*100
+        DEA = min(DEA_list[:model_counter])
+        minDEA = min(DEA_list[:min(100, perioddaynum)])
+        minDEAdate = funddata_list[DEA_list.index(minDEA)][0]
+        DEAratio = min(DEAratio_list[:model_counter])
+        minDEAratio = min(DEAratio_list[:min(100, perioddaynum)])
+        minDEAratiodate = funddata_list[DEAratio_list.index(minDEAratio)][0]
+        MACD_result = [fundinfo, model_predict, model_counter, DEA, DEAratio, model_range, model_slope, round(cross_range,2), round(trend_range,2), round(parallel_range,2), minDEA, minDEAdate, minDEAratio, minDEAratiodate]
+    if((DIFF_list[1]<0) and (DIFF_list[0]>DIFF_list[1])):
+        model_counter = 1
+        for ii in range(1, perioddaynum):
             if(DIFF_list[ii]<0):
-                DIFF_counter+=1
+                model_counter+=1
             else:
                 break
-        DIFF_predict = math.ceil(DIFF_list[-1]/(DIFF_list[-2]-DIFF_list[-1]))
-        cross_price = (25/27*EMA26-11/13*EMA12)/(2/13-2/27)
-        slope_price = (2*DIFF_list[-1]-DIFF_list[-2]+25/27*EMA26-11/13*EMA12)/(2/13-2/27)
-        parallel_price = (DIFF_list[-1]+25/27*EMA26-11/13*EMA12)/(2/13-2/27)
-        DIFF_slope = (DIFF_list[-1]-DIFF_list[-2])/float(funddata_list[0][4])
-        DEA_ratio = DEA9_list[-1]/float(funddata_list[0][4])
-        DIFF_ratio = DIFF_list[-1]/DEA9_list[-1]
-        DIFF_result = [fundinfo, DIFF_predict, DIFF_counter, round(DIFF_ratio,2), DEA_ratio, DIFF_slope, funddata_list[0][4], round(cross_price,2), round(slope_price,2), round(parallel_price,2)]
+        model_range = (closingprice/closingprice_list[model_counter]-1)*100
+        model_predict = math.ceil(DIFF_list[0]/(DIFF_list[1]-DIFF_list[0]))
+        model_slope = (DIFF_list[0]-DIFF_list[1])/closingprice
+# Solve Function DIFF(new) = DIFF (i.e. 0, DIFF_list[0], 2*DIFF_list[0]-DIFF_list[1])
+# EMA1(new)-EMA2(new) = DIFF
+# ((N1-1)/(N1+1)*EMA1_list[0]+2/(N1+1)*x)-((N2-1)/(N2+1)*EMA2_list[0]+2/(N2+1)*x) = DIFF
+# x = (DIFF+(N2-1)/(N2+1)*EMA2_list[0]-(N1-1)/(N1+1)*EMA1_list[0])/(2/(N1+1)-2/(N2+1))
+        cross_price = ((N2-1)/(N2+1)*EMA2_list[0]-(N1-1)/(N1+1)*EMA1_list[0])/(2/(N1+1)-2/(N2+1))
+        cross_range = (cross_price/closingprice-1)*100
+        trend_price = ((2*DIFF_list[0]-DIFF_list[1])+(N2-1)/(N2+1)*EMA2_list[0]-(N1-1)/(N1+1)*EMA1_list[0])/(2/(N1+1)-2/(N2+1))
+        trend_range = (trend_price/closingprice-1)*100
+        parallel_price = (DIFF_list[0]+(N2-1)/(N2+1)*EMA2_list[0]-(N1-1)/(N1+1)*EMA1_list[0])/(2/(N1+1)-2/(N2+1))
+        parallel_range = (parallel_price/closingprice-1)*100
+        DEA = min(DEA_list[:model_counter])
+        minDEA = min(DEA_list[:min(100, perioddaynum)])
+        minDEAdate = funddata_list[DEA_list.index(minDEA)][0]
+        DEAratio = min(DEAratio_list[:model_counter])
+        minDEAratio = min(DEAratio_list[:min(100, perioddaynum)])
+        minDEAratiodate = funddata_list[DEAratio_list.index(minDEAratio)][0]
+        DIFF_result = [fundinfo, model_predict, model_counter, model_range, model_slope, DEA, DEAratio, round(cross_range,2), round(trend_range,2), round(parallel_range,2), minDEA, minDEAdate, minDEAratio, minDEAratiodate]
     return MACD_result, DIFF_result
 
 

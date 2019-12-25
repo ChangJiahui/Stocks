@@ -188,6 +188,53 @@ def holders_Model_Select():
     write_csvfile(resultfile_path, title, resultdata_list)
 
 
+def gdzjc_Model_Select():
+# 东方财富网增减持数据
+    stockgdzjc_path = os.path.join(root_path, "Data", "stock_gdzjc")
+    def get_stockzjc():
+        with open(stockinfo_file, 'r') as fp:
+            for stockinfo in fp.readlines():
+                stockinfo = stockinfo.strip()
+                stockcode = stockinfo[-6:]
+                zjc_title = ["股票名称", "最新价", "涨跌幅(%)", "股东名称", "增减", "方式", "变动开始日", "变动截止日", "公告日", "变动数量(万股)", "占总股本比例(%)", "占流通股比例(%)",  "持股总数(万股)", "占总股本比例", "持流通股数(万股)", "占流通股比例"]
+                zjcdata_list = []
+                GZiWEAqK = get_jsvar('http://data.eastmoney.com/DataCenter_V3/gdzjc.ashx?pagesize=1000&page=1&js=var%20GZiWEAqK&param=&sortRule=-1&sortType=BDJZ&tabid=all&code={}'.format(stockcode), 'GZiWEAqK')
+                if(GZiWEAqK!=None):
+                    stockzjc_list = GZiWEAqK['data']
+                    if(len(stockzjc_list)!=0):
+                        for stockzjc in stockzjc_list:
+                            stockzjcitem = stockzjc.split(',')
+                            zjcdata_list.append([stockinfo]+stockzjcitem[2:6]+[stockzjcitem[8]]+stockzjcitem[13:16]+[stockzjcitem[6], stockzjcitem[16], stockzjcitem[7]]+stockzjcitem[9:13])
+                        write_csvfile(os.path.join(stockgdzjc_path, '{}.csv'.format(stockinfo)), zjc_title, zjcdata_list)
+    get_stockzjc()
+    resultfile_path = os.path.join(resultdata_path, "gdzjc_Model_Select_Result.csv")
+    title = ["股票名称", "最新价", "涨跌幅(%)", "股东名称", "增减", "方式", "变动开始日", "变动截止日", "公告日", "变动数量(万股)", "占总股本比例(%)", "占流通股比例(%)",  "持股总数(万股)", "占总股本比例", "持流通股数(万股)", "占流通股比例"]
+    resultdata_list = []
+    for filename in os.listdir(stockgdzjc_path):
+        _, stockzjcdata_list = read_csvfile(os.path.join(stockgdzjc_path, filename))
+        stockinfo = filename.split(".")[0]
+        if(len(stockzjcdata_list)>0):
+            resultdata_list.append(stockzjcdata_list[0])
+    write_csvfile(resultfile_path, title, resultdata_list)
+
+
+def repurchase_Model_Select():
+# 股票回购信息汇总
+    resultfile_path = os.path.join(resultdata_path, "repurchase_Model_Select_Result.csv")
+    title = ["股票代码", "公告日期", "截止日期", "进度", "过期日期", "回购数量", "回购金额", "回购最高价", "回购最低价"]
+    resultdata_list = []
+    for ii in range(3):
+        try:
+            df_repurchase = tspro.repurchase(ann_date="")
+            for item in df_repurchase.values:
+                if(item[0][:3]!="300"):
+                    resultdata_list.append(list(item))
+            break
+        except Exception as e:
+            print(e)
+            time.sleep(600)
+    write_csvfile(resultfile_path, title, resultdata_list)
+
+
 if __name__=="__main__":
-    tunet_connect()
     holders_Model_Select()
