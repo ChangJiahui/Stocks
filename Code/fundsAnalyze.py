@@ -191,8 +191,8 @@ def MACDDIFF_Model_Select():
 # MACD 模型 (12,26,9) & 中间量 DIFF 模型
     resultfile_path1 = os.path.join(resultdata_path, "MACD_Model_Select_Result.csv")
     resultfile_path2 = os.path.join(resultdata_path, "DIFF_Model_Select_Result.csv")
-    title1 = ["基金信息", "估算MACD贯穿天数", "MACD下方天数", "上穿前总跌幅", "MACD斜率", "DEA", "相对DEA比例", "MACD交叉预测涨跌幅", "MACD趋势预测涨跌幅", "MACD平行预测涨跌幅", "百日最低DEA比例", "日期", "百日最低相对DEA比例", "日期"]
-    title2 = ["基金信息", "估算DIFF贯穿天数", "DIFF下方天数", "上穿前总跌幅", "DIFF斜率", "DEA", "相对DEA比例", "DIFF交叉预测涨跌幅", "DIFF趋势预测涨跌幅", "DIFF平行预测涨跌幅", "百日最低DEA比例", "日期", "百日最低相对DEA比例", "日期"]
+    title1 = ["基金信息", "估算MACD贯穿天数", "MACD下方天数", "上穿前总跌幅", "MACD斜率", "DEA", "相对DEA比例", "MACD交叉预测涨跌幅", "MACD趋势预测涨跌幅", "MACD平行预测涨跌幅", "百日最大下方天数", "百日最大上穿前跌幅", "百日最低DEA比例", "日期", "百日最低相对DEA比例", "日期"]
+    title2 = ["基金信息", "估算DIFF贯穿天数", "DIFF下方天数", "上穿前总跌幅", "DIFF斜率", "DEA", "相对DEA比例", "DIFF交叉预测涨跌幅", "DIFF趋势预测涨跌幅", "DIFF平行预测涨跌幅", "百日最大下方天数", "百日最大上穿前跌幅", "百日最低DEA比例", "日期", "百日最低相对DEA比例", "日期"]
     resultdata_list1 = []
     resultdata_list2 = []
     for filename in os.listdir(funddata_path):
@@ -204,8 +204,8 @@ def MACDDIFF_Model_Select():
 def MACDDIFF_Model_Select_par():
     resultfile_path1 = os.path.join(resultdata_path, "MACD_Model_Select_Result.csv")
     resultfile_path2 = os.path.join(resultdata_path, "DIFF_Model_Select_Result.csv")
-    title1 = ["基金信息", "当日涨跌幅", "估算MACD贯穿天数", "MACD下方天数", "上穿前总跌幅", "MACD斜率", "DEA", "相对DEA比例", "MACD交叉预测涨跌幅", "MACD趋势预测涨跌幅", "MACD平行预测涨跌幅", "百日最低DEA比例", "日期", "百日最低相对DEA比例", "日期"]
-    title2 = ["基金信息", "当日涨跌幅", "估算DIFF贯穿天数", "DIFF下方天数", "上穿前总跌幅", "DIFF斜率", "DEA", "相对DEA比例", "DIFF交叉预测涨跌幅", "DIFF趋势预测涨跌幅", "DIFF平行预测涨跌幅", "百日最低DEA比例", "日期", "百日最低相对DEA比例", "日期"]
+    title1 = ["基金信息", "估算MACD贯穿天数", "MACD下方天数", "上穿前总跌幅", "MACD斜率", "DEA", "相对DEA比例", "MACD交叉预测涨跌幅", "MACD趋势预测涨跌幅", "MACD平行预测涨跌幅", "百日最大下方天数", "百日最大上穿前跌幅", "百日最低DEA比例", "日期", "百日最低相对DEA比例", "日期"]
+    title2 = ["基金信息", "估算DIFF贯穿天数", "DIFF下方天数", "上穿前总跌幅", "DIFF斜率", "DEA", "相对DEA比例", "DIFF交叉预测涨跌幅", "DIFF趋势预测涨跌幅", "DIFF平行预测涨跌幅", "百日最大下方天数", "百日最大上穿前跌幅", "百日最低DEA比例", "日期", "百日最低相对DEA比例", "日期"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(MACDDIFF1_Model_Select_pipeline, os.listdir(funddata_path))
     pool.close()
@@ -218,7 +218,7 @@ def MACDDIFF_Model_Select_pipeline(filename, N1, N2, N3):
     _, funddata_list = read_csvfile(os.path.join(funddata_path, filename))
     fundinfo = filename.split(".")[0]
     closingprice = float(funddata_list[0][4])
-    perioddaynum = min(400, len(stockdata_list)-1)
+    perioddaynum = min(400, len(funddata_list)-1)
     if(perioddaynum<200):
         return [], []
     closingprice_list = [float(item[4]) for item in funddata_list[:perioddaynum+1]]
@@ -274,7 +274,23 @@ def MACDDIFF_Model_Select_pipeline(filename, N1, N2, N3):
         DEAratio = min(DEAratio_list[:model_counter])
         minDEAratio = min(DEAratio_list[:min(100, perioddaynum)])
         minDEAratiodate = funddata_list[DEAratio_list.index(minDEAratio)][0]
-        MACD_result = [fundinfo, model_predict, model_counter, DEA, DEAratio, model_range, model_slope, round(cross_range,2), round(trend_range,2), round(parallel_range,2), minDEA, minDEAdate, minDEAratio, minDEAratiodate]
+        maxmodel_counter = 0
+        maxmodel_range = 0
+        for ii in range(model_counter, min(100, perioddaynum)):
+            tempmodel_counter = 0
+            tempmodel_range = 0
+            for jj in range(ii, perioddaynum):
+                if(MACD_list[jj]<0):
+                    tempmodel_counter += 1
+                else:
+                    tempmodel_range = (closingprice_list[ii]/closingprice_list[ii+tempmodel_counter]-1)*100
+                    if(maxmodel_counter<tempmodel_counter):
+                        maxmodel_counter = tempmodel_counter
+                    if(maxmodel_range>tempmodel_range):
+                        maxmodel_range = tempmodel_range
+                    break
+        if(model_range<maxmodel_range/2):
+            MACD_result = [fundinfo, model_predict, model_counter, model_range, model_slope, DEA, DEAratio, round(cross_range,2), round(trend_range,2), round(parallel_range,2), maxmodel_counter, maxmodel_range, minDEA, minDEAdate, minDEAratio, minDEAratiodate]
     if((DIFF_list[1]<0) and (DIFF_list[0]>DIFF_list[1])):
         model_counter = 1
         for ii in range(1, perioddaynum):
@@ -301,7 +317,23 @@ def MACDDIFF_Model_Select_pipeline(filename, N1, N2, N3):
         DEAratio = min(DEAratio_list[:model_counter])
         minDEAratio = min(DEAratio_list[:min(100, perioddaynum)])
         minDEAratiodate = funddata_list[DEAratio_list.index(minDEAratio)][0]
-        DIFF_result = [fundinfo, model_predict, model_counter, model_range, model_slope, DEA, DEAratio, round(cross_range,2), round(trend_range,2), round(parallel_range,2), minDEA, minDEAdate, minDEAratio, minDEAratiodate]
+        maxmodel_counter = 0
+        maxmodel_range = 0
+        for ii in range(model_counter, min(100, perioddaynum)):
+            tempmodel_counter = 0
+            tempmodel_range = 0
+            for jj in range(ii, perioddaynum):
+                if(DIFF_list[jj]<0):
+                    tempmodel_counter += 1
+                else:
+                    tempmodel_range = (closingprice_list[ii]/closingprice_list[ii+tempmodel_counter]-1)*100
+                    if(maxmodel_counter<tempmodel_counter):
+                        maxmodel_counter = tempmodel_counter
+                    if(maxmodel_range>tempmodel_range):
+                        maxmodel_range = tempmodel_range
+                    break
+        if(model_range<maxmodel_range/2):
+            DIFF_result = [fundinfo, model_predict, model_counter, model_range, model_slope, DEA, DEAratio, round(cross_range,2), round(trend_range,2), round(parallel_range,2), maxmodel_counter, maxmodel_range, minDEA, minDEAdate, minDEAratio, minDEAratiodate]
     return MACD_result, DIFF_result
 
 

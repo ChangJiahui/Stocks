@@ -5,16 +5,20 @@ import threading
 import time
 import datetime
 import math
+import os
+import csv
 
 
-ts.set_token("119921ff45f95fd77e5d149cd1e64e78572712b3d0a5ce38157f255b")
-pro = ts.pro_api()
+tspro = ts.pro_api("119921ff45f95fd77e5d149cd1e64e78572712b3d0a5ce38157f255b")
+day_time = time.strftime('%Y%m%d', time.localtime(time.time()))
 
 Bidding_Time = "09:00:00"
 Opening_Time = "09:30:00"
 Noon_Begin = "11:30:00"
 Noon_End = "13:00:00"
 Closing_Time = "15:00:00"
+
+root_path = "D:\\Workspace\\Python\\Stocks"
 
 
 def read_csvfile(filename):
