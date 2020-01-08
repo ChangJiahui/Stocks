@@ -13,7 +13,6 @@ end_time = time.strftime('%Y%m%d',time.localtime(time.time()-24*3600))
 
 root_path = "D:\\Workspace\\Python\\Stocks"
 stockdata_path = os.path.join(root_path, "Data", "stock_data")
-EHBFfile_path = os.path.join(root_path, "Result", "Stocks", "EHBF_Analyze_Result.csv")
 accountbook_path = os.path.join(root_path, "Trade.csv")
 tradefile_path = os.path.join(root_path, "Trade.log")
 
@@ -90,9 +89,9 @@ def trade_analyze():
         maxprice = float(stockdata_list[0][4])
         minprice = float(stockdata_list[0][5])
         if(maxprice>=float(tradeitem[6])):
-            return ("\t接近箱体上沿提示 高位价格: " + str(tradeitem[6]) + "\n")
+            return ("\t突破箱体上沿提示 高位价格: " + str(tradeitem[6]) + "\n")
         elif(minprice<=float(tradeitem[5])):
-            return ("\t接近箱体下沿提示 低位价格: " + str(tradeitem[5]) + "\n")
+            return ("\t突破箱体下沿提示 低位价格: " + str(tradeitem[5]) + "\n")
         else:
             return ""
 
@@ -336,6 +335,71 @@ def trade_analyze():
         else:
             return ""
 
+    def wave_Model_Trade_pipeline(stockdata_list):
+        closingprice = float(stockdata_list[0][3])
+        perioddaynum = min(500, len(stockdata_list))
+        rounddaynum = 10
+        closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum]]
+        maxprice_list = []
+        minprice_list = []
+        maxoffset_list = []
+        minoffset_list = []
+        lastextremeprice = 0.01
+        startoffset = perioddaynum-1
+        for ii in range(perioddaynum):
+            if(closingprice_list[ii]==min(closingprice_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])):
+                minprice_list.append(closingprice_list[ii])
+                minoffset_list.append(ii)
+                startoffset = ii
+                lastextremeprice=closingprice_list[ii]
+                isDrop = True
+                break
+        for ii in range(startoffset+1, perioddaynum):
+            tempmaxprice = max(closingprice_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])
+            tempminprice = min(closingprice_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])
+            if(isDrop):
+                if((closingprice_list[ii]==tempmaxprice) and ((closingprice_list[ii]-lastextremeprice)/closingprice_list[ii]>0.10)):
+                    maxprice_list.append(closingprice_list[ii])
+                    maxoffset_list.append(ii)
+                    lastextremeprice=closingprice_list[ii]
+                    isDrop = False
+                elif((closingprice_list[ii]==tempminprice) and (closingprice_list[ii]<minprice_list[-1])):
+                    minprice_list[-1]=closingprice_list[ii]
+                    minoffset_list[-1]=ii
+                    lastextremeprice=closingprice_list[ii]
+            else:
+                if((closingprice_list[ii]==tempminprice) and ((closingprice_list[ii]-lastextremeprice)/closingprice_list[ii]<-0.10)):
+                    minprice_list.append(closingprice_list[ii])
+                    minoffset_list.append(ii)
+                    lastextremeprice=closingprice_list[ii]
+                    isDrop = True
+                elif((closingprice_list[ii]==tempmaxprice) and (closingprice_list[ii]>maxprice_list[-1])):
+                    maxprice_list[-1]=closingprice_list[ii]
+                    maxoffset_list[-1]=ii
+                    lastextremeprice=closingprice_list[ii]
+        upwavecounter = 0
+        downwavecounter = 0
+        for ii in range(len(maxprice_list)-2):
+            if(minprice_list[ii]>=minprice_list[ii+1]):
+                upwavecounter+=1
+            else:
+                break
+        for ii in range(upwavecounter+1, len(maxprice_list)-1):
+            if(maxprice_list[ii]<=maxprice_list[ii+1]):
+                downwavecounter+=1
+            else:
+                break
+        if((len(minprice_list)>0) and ((len(maxprice_list)>0))):
+            failrange = (minprice_list[0]/maxprice_list[0]-1)*100
+            failcounter = maxoffset_list[0]-minoffset_list[0]
+            reboundrange = (closingprice/minprice_list[0]-1)*100
+            reboundcounter = minoffset_list[0]
+            retracerange = (closingprice/max(closingprice_list[:minoffset_list[0]])-1)*100
+            if(reboundrange<5):
+                return "\twave低点买入信号 买入价格: " + str(round(minprice_list[0],2)) + "\n"
+            elif(retracerange>-5):
+                return "\twave回撤卖出信号 卖出价格: " + str(round(maxprice_list[0],2)) + "\n"
+        return ""
 
     resultstr = ""
     title, trade_list = read_csvfile(accountbook_path)
@@ -344,31 +408,28 @@ def trade_analyze():
         filename = os.path.join(stockdata_path, stockinfo+".csv")
         _, stockdata_list = read_csvfile(filename)
         if(stockdata_list!=[]):
-            stockLastTradePrice = float(trade_list[ii][3])
-            trade_list[ii][7] = float(trade_list[ii][1])*float(trade_list[ii][2])
-            trade_list[ii][8] = float(trade_list[ii][3])*float(trade_list[ii][4])
+            trade_list[ii][7] = round(float(trade_list[ii][3])*0.97,2)
+            trade_list[ii][8] = round(float(trade_list[ii][3])*1.03,2)
             trade_list[ii][9] = stockdata_list[0][3]
-            trade_list[ii][10] = float(trade_list[ii][9])/float(trade_list[ii][1])-1
-            _, EHBFdata_list = read_csvfile(EHBFfile_path)
-            for EHBFitem in EHBFdata_list:
-                    if(EHBFitem[0]==stockinfo):
-                        trade_list[ii][11] = EHBFitem[2]
-            trade_list[ii][12] = round(stockLastTradePrice*0.97,2)
-            trade_list[ii][13] = round(stockLastTradePrice*1.03,2)
+            trade_list[ii][10] = float(trade_list[ii][1])*float(trade_list[ii][2])
+            trade_list[ii][11] = float(trade_list[ii][3])*float(trade_list[ii][4])
+            trade_list[ii][12] = float(trade_list[ii][9])/float(trade_list[ii][1])-1
             resultstr = resultstr + stockinfo + " 当前价格:" + str(stockdata_list[0][3]) + "\n"
-            resultstr = resultstr + point_Model_Trade_pipeline(trade_list[ii], stockdata_list) \
-                                  + grid_Model_Trade_pipeline(stockLastTradePrice, stockdata_list) \
+            resultstr = resultstr + wave_Model_Trade_pipeline(stockdata_list) \
+                                  + grid_Model_Trade_pipeline(float(trade_list[ii][3]), stockdata_list) \
                                   + MACD_Model_Trade_pipeline(stockdata_list) \
                                   + KDJ_Model_Trade_pipeline(stockdata_list) \
                                   + DMI_Model_Trade_pipeline(stockdata_list) \
                                   + EMV_Model_Trade_pipeline(stockdata_list) \
-                                  + trend1T5_Model_Select_pipeline(stockdata_list)
+                                  + trend1T5_Model_Select_pipeline(stockdata_list) \
+                                  + point_Model_Trade_pipeline(trade_list[ii], stockdata_list)
         else:
             resultstr = stockinfo + " 股票名称错误!" + '\n' + resultstr
-            trade_list[ii][7:12] = [0]*5
-            stockLastTradePrice = float(trade_list[ii][3])
-            trade_list[ii][12] = round(stockLastTradePrice*0.97,2)
-            trade_list[ii][13] = round(stockLastTradePrice*1.03,2)
+            trade_list[ii][7:13] = [0]*6
+            trade_list[ii][7] = round(float(trade_list[ii][3])*0.97,2)
+            trade_list[ii][8] = round(float(trade_list[ii][3])*1.03,2)
+            trade_list[ii][10] = float(trade_list[ii][1])*float(trade_list[ii][2])
+            trade_list[ii][11] = float(trade_list[ii][3])*float(trade_list[ii][4])
     write_csvfile(accountbook_path, title, trade_list)
     if(resultstr!=""):
         with open(tradefile_path, 'w') as fp:
