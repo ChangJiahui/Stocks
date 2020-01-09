@@ -394,15 +394,17 @@ def trade_analyze():
             failcounter = maxoffset_list[0]-minoffset_list[0]
             reboundrange = (closingprice/minprice_list[0]-1)*100
             reboundcounter = minoffset_list[0]
-            retracerange = (closingprice/max(closingprice_list[:minoffset_list[0]])-1)*100
+            maxprice = max(closingprice_list[:minoffset_list[0]])
+            retracerange = (closingprice/maxprice-1)*100
             if(reboundrange<5):
                 return "\twave低点买入信号 买入价格: " + str(round(minprice_list[0],2)) + "\n"
-            elif(retracerange>-5):
-                return "\twave回撤卖出信号 卖出价格: " + str(round(maxprice_list[0],2)) + "\n"
+            elif(retracerange<-5):
+                return "\twave回撤卖出信号 卖出价格: " + str(round(maxprice,2)) + "\n"
         return ""
 
     resultstr = ""
     title, trade_list = read_csvfile(accountbook_path)
+#    title = ["股票名称", "成本价格", "持仓数量", "最近交易价格", "最近交易数量", "低位价格", "高位价格", "跌3%价格", "涨3%价格", "当前价格", "持仓市值", "最近交易市值", "盈利比例"]
     for ii in range(len(trade_list)):
         stockinfo = trade_list[ii][0]
         filename = os.path.join(stockdata_path, stockinfo+".csv")
