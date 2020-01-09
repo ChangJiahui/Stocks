@@ -187,6 +187,156 @@ def isMarketOpen():
         return False
 
 
+def EHBF_Analyze():
+# 横盘天数 & 振幅 & EMA & earnratio & PE & PB
+    resultfile_path = os.path.join(resultdata_path, "EHBF_Analyze_Result.csv")
+    title = ["基金名称", "当日涨跌幅", "历史位置(%)", "百日位置(%)", "总交易日", "30日跌幅"]
+    resultdata_list = []
+    for filename in os.listdir(funddata_path):
+        resultdata_list.append(EHBF_Analyze_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def EHBF_Analyze_par():
+    resultfile_path = os.path.join(resultdata_path, "EHBF_Analyze_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "历史位置(%)", "百日位置(%)", "总交易日", "30日跌幅"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(EHBF_Analyze_pipeline, os.listdir(funddata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def EHBF_Analyze_pipeline(filename):
+    _, funddata_list = read_csvfile(os.path.join(funddata_path, filename))
+    fundinfo = filename[:filename.rfind(".")]
+    closingprice = float(funddata_list[0][4])
+    perioddaynum = len(funddata_list)
+    closingprice_list = [float(item[4]) for item in funddata_list[:perioddaynum]]
+    maxprice = max(closingprice_list)
+    minprice = min(closingprice_list)
+    reboundrange1 = (closingprice-minprice)/(maxprice-minprice)*100
+    closingprice_list = [float(item[4]) for item in funddata_list[:100]]
+    maxprice = max(closingprice_list)
+    minprice = min(closingprice_list)
+    reboundrange2 = (closingprice-minprice)/(maxprice-minprice)*100
+    drop30range = (closingprice_list[0]/closingprice_list[min(30,perioddaynum-1)]-1)*100
+    return [fundinfo, funddata_list[0][5], reboundrange1, reboundrange2, len(funddata_list), drop30range]
+
+
+def wave_Model_Select():
+# 波浪模型
+    resultfile_path = os.path.join(resultdata_path, "wave_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "降浪波数", "升浪波数", "最近回升幅度", "最近回升天数", "最近下跌幅度", "最近下跌天数", "最近浪底涨跌", "最近浪顶涨跌", "上一回升幅度", "上一回升天数", "上一下跌幅度", "上一下跌天数", "上一浪底涨跌", "上一浪顶涨跌", "总回升幅度", "总回升天数", "总下跌幅度", "总下跌天数", "最大回升幅度", "最大回升天数", "最大下跌幅度", "最大下跌天数"]
+    resultdata_list = []
+    for filename in os.listdir(funddata_path):
+        resultdata_list.append(wave_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def wave_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "wave_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "降浪波数", "升浪波数", "最近回升幅度", "最近回升天数", "最近下跌幅度", "最近下跌天数", "最近浪底涨跌", "最近浪顶涨跌", "上一回升幅度", "上一回升天数", "上一下跌幅度", "上一下跌天数", "上一浪底涨跌", "上一浪顶涨跌", "总回升幅度", "总回升天数", "总下跌幅度", "总下跌天数", "最大回升幅度", "最大回升天数", "最大下跌幅度", "最大下跌天数"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(wave_Model_Select_pipeline, os.listdir(funddata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def wave_Model_Select_pipeline(filename):
+    _, funddata_list = read_csvfile(os.path.join(funddata_path, filename))
+    fundinfo = filename[:filename.rfind(".")]
+    closingprice = float(funddata_list[0][4])
+    rounddaynum = 10
+    perioddaynum = min(500, len(funddata_list)-rounddaynum)
+    if(perioddaynum<200):
+        return []
+    closingprice_list = [float(item[4]) for item in funddata_list[:perioddaynum]]
+    maxprice_list = []
+    minprice_list = []
+    maxoffset_list = []
+    minoffset_list = []
+    lastextremeprice = 0.01
+    startoffset = perioddaynum-1
+    for ii in range(perioddaynum):
+        if(closingprice_list[ii]==min(closingprice_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])):
+            minprice_list.append(closingprice_list[ii])
+            minoffset_list.append(ii)
+            startoffset = ii
+            lastextremeprice=closingprice_list[ii]
+            isDrop = True
+            break
+    for ii in range(startoffset+1, perioddaynum):
+        tempmaxprice = max(closingprice_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])
+        tempminprice = min(closingprice_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])
+        if(isDrop):
+            if((closingprice_list[ii]==tempmaxprice) and ((closingprice_list[ii]-lastextremeprice)/closingprice_list[ii]>0.10)):
+                maxprice_list.append(closingprice_list[ii])
+                maxoffset_list.append(ii)
+                lastextremeprice=closingprice_list[ii]
+                isDrop = False
+            elif((closingprice_list[ii]==tempminprice) and (closingprice_list[ii]<minprice_list[-1])):
+                minprice_list[-1]=closingprice_list[ii]
+                minoffset_list[-1]=ii
+                lastextremeprice=closingprice_list[ii]
+        else:
+            if((closingprice_list[ii]==tempminprice) and ((closingprice_list[ii]-lastextremeprice)/closingprice_list[ii]<-0.10)):
+                minprice_list.append(closingprice_list[ii])
+                minoffset_list.append(ii)
+                lastextremeprice=closingprice_list[ii]
+                isDrop = True
+            elif((closingprice_list[ii]==tempmaxprice) and (closingprice_list[ii]>maxprice_list[-1])):
+                maxprice_list[-1]=closingprice_list[ii]
+                maxoffset_list[-1]=ii
+                lastextremeprice=closingprice_list[ii]
+    upwavecounter = 0
+    downwavecounter = 0
+    for ii in range(len(maxprice_list)-2):
+        if(minprice_list[ii]>=minprice_list[ii+1]):
+            upwavecounter+=1
+        else:
+            break
+    for ii in range(upwavecounter+1, len(maxprice_list)-1):
+        if(maxprice_list[ii]<=maxprice_list[ii+1]):
+            downwavecounter+=1
+        else:
+            break
+    if((len(minprice_list)>3) and ((len(maxprice_list)>3))):
+        failrange = (minprice_list[0]/maxprice_list[0]-1)*100
+        failcounter = maxoffset_list[0]-minoffset_list[0]
+        reboundrange = (closingprice/minprice_list[0]-1)*100
+        reboundcounter = minoffset_list[0]
+        wavevallratio = (minprice_list[0]/minprice_list[1]-1)*100
+        wavepeakratio = (maxprice_list[0]/maxprice_list[1]-1)*100
+        lastfailrange = (minprice_list[1]/maxprice_list[1]-1)*100
+        lastfailcounter = maxoffset_list[1]-minoffset_list[1]
+        lastreboundrange = (maxprice_list[0]/minprice_list[1]-1)*100
+        lastreboundcounter = minoffset_list[1]-maxoffset_list[0]
+        lastwavepeakratio = (maxprice_list[1]/maxprice_list[2]-1)*100
+        lastwavevallratio = (minprice_list[1]/minprice_list[2]-1)*100
+        minprice = minprice_list[upwavecounter]
+        maxprice = maxprice_list[upwavecounter+1+downwavecounter]
+        sumfailrange = (minprice/maxprice-1)*100
+        sumfailcounter = maxoffset_list[upwavecounter+1+downwavecounter] - minoffset_list[upwavecounter]
+        sumreboundrange = (closingprice/minprice-1)*100
+        sumreboundcounter = minoffset_list[upwavecounter]
+        maxfailrange = 0
+        maxreboundrange = 0
+        maxfailcounter = 0
+        maxreboundcounter = 0
+        for ii in range(2, len(minprice_list)-1):
+            tempfailrange = (minprice_list[ii]/maxprice_list[ii]-1)*100
+            tempreboundrange = (maxprice_list[ii]/minprice_list[ii+1]-1)*100
+            tempfailcounter = maxoffset_list[ii]-minoffset_list[ii]
+            tempreboundcounter = minoffset_list[ii+1]-maxoffset_list[ii]
+            if(maxfailrange>tempfailrange):
+                maxfailrange = tempfailrange
+            if(maxreboundrange<tempreboundrange):
+                maxreboundrange = tempreboundrange
+            if(maxfailcounter<tempfailcounter):
+                maxfailcounter = tempfailcounter
+            if(maxreboundcounter<tempreboundcounter):
+                maxreboundcounter = tempreboundcounter
+        if((failrange<lastfailrange*2/3) and (failcounter>lastfailcounter) and (reboundrange<abs(failrange)/3) and (3<reboundcounter)):
+            return [fundinfo, funddata_list[0][5], downwavecounter, upwavecounter, reboundrange, reboundcounter, failrange, failcounter, wavevallratio, wavepeakratio,
+                    lastreboundrange, lastreboundcounter, lastfailrange, lastfailcounter, lastwavevallratio, lastwavepeakratio,
+                    sumreboundrange, sumreboundcounter, sumfailrange, sumfailcounter, maxreboundrange, maxreboundcounter, maxfailrange, maxfailcounter]
+    return []
+
+
 def MACDDIFF_Model_Select():
 # MACD 模型 (12,26,9) & 中间量 DIFF 模型
     resultfile_path1 = os.path.join(resultdata_path, "MACD_Model_Select_Result.csv")
@@ -216,7 +366,7 @@ def MACDDIFF1_Model_Select_pipeline(filename):
     return MACDDIFF_Model_Select_pipeline(filename, 12, 26, 9)
 def MACDDIFF_Model_Select_pipeline(filename, N1, N2, N3):
     _, funddata_list = read_csvfile(os.path.join(funddata_path, filename))
-    fundinfo = filename.split(".")[0]
+    fundinfo = filename[:filename.rfind(".")]
     closingprice = float(funddata_list[0][4])
     perioddaynum = min(400, len(funddata_list)-1)
     if(perioddaynum<200):
@@ -349,6 +499,14 @@ def clear_data():
 
 
 def analyze_funddata():
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tEHBF_Analyze Begin!")
+#    EHBF_Analyze()
+    EHBF_Analyze_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tEHBF_Analyze Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\twave_Model_Select Begin!")
+#    wave_Model_Select()
+    wave_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\twave_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMACDDIFF_Model_Select Begin!")
 #    MACDDIFF_Model_Select()
     MACDDIFF_Model_Select_par()
