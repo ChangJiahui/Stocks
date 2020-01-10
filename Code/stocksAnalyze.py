@@ -750,17 +750,65 @@ def shadow_Model_Select_pipeline(filename):
     return []
 
 
+def parting_Model_Select():
+# 分型模型 n=2
+    resultfile_path = os.path.join(resultdata_path, "parting_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "下分型回升幅度", "回升天数", "上分型下跌幅度", "下跌天数"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(parting_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def parting_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "parting_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "下分型回升幅度", "回升天数", "上分型下跌幅度", "下跌天数"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(parting_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def parting_Model_Select_pipeline(filename):
+    N = 2
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    closingprice = float(stockdata_list[0][3])
+    perioddaynum = min(400, len(stockdata_list)-N)
+    if(perioddaynum<200):
+        return []
+    closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N]]
+    upperprice_list = [float(item[4]) for item in stockdata_list[:perioddaynum+N]]
+    lowerprice_list = [float(item[5]) for item in stockdata_list[:perioddaynum+N]]
+    maxprice_list = []
+    minprice_list = []
+    maxoffset_list = []
+    minoffset_list = []
+    for ii in range(N, perioddaynum-1):
+        if(upperprice_list[ii]==max(upperprice_list[ii-N:ii+N+1])):
+            maxprice_list.append(upperprice_list[ii])
+            maxoffset_list.append(ii)
+        if(lowerprice_list[ii]==min(lowerprice_list[ii-N:ii+N+1])):
+            minprice_list.append(lowerprice_list[ii])
+            minoffset_list.append(ii)
+    if((len(minoffset_list)>3) and (len(maxoffset_list)>3) and (minoffset_list[0]<maxoffset_list[0])):
+        failrange = (minprice_list[0]/maxprice_list[0]-1)*100
+        failcounter = maxoffset_list[0]-minoffset_list[0]
+        reboundrange = (closingprice/minprice_list[0]-1)*100
+        reboundcounter = minoffset_list[0]
+        if((failrange<0) and reboundrange<abs(failrange)/3):
+            return [stockinfo, stockdata_list[0][9], reboundrange, reboundcounter, failrange, failcounter]
+    return []
+
+
 def RSRS_Model_Select():
 # RSRS择时模型
     resultfile_path = os.path.join(resultdata_path, "RSRS_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "RSRS因子", "下方天数", "上穿前总跌幅", "beta值", "百日位置"]
+    title = ["股票名称", "当日涨跌幅", "RSRS因子", "beta值", "rsquared", "最近多头幅度", "最近多头天数", "最近空头幅度", "最近空头天数", "上一多头幅度", "上一多头天数", "上一空头幅度", "上一空头天数"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         resultdata_list.append(RSRS_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
 def RSRS_Model_Select_par():
     resultfile_path = os.path.join(resultdata_path, "RSRS_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "RSRS因子", "下方天数", "上穿前总跌幅", "beta值", "百日位置"]
+    title = ["股票名称", "当日涨跌幅", "RSRS因子", "beta值", "rsquared", "最近多头幅度", "最近多头天数", "最近空头幅度", "最近空头天数", "上一多头幅度", "上一多头天数", "上一空头幅度", "上一空头天数"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(RSRS_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -768,7 +816,8 @@ def RSRS_Model_Select_par():
     write_csvfile(resultfile_path, title, resultdata_list)
 def RSRS_Model_Select_pipeline(filename):
     N = 18
-    P = 0.8
+    P1 = 0.8
+    P2 = 1.0
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     closingprice = float(stockdata_list[0][3])
@@ -789,21 +838,35 @@ def RSRS_Model_Select_pipeline(filename):
         r2 = modelfit.rsquared
         beta_list[ii] = beta
         rsquared_list[ii] = r2
-    for ii in range(perioddaynum):
-        betadist_list[ii] = sum([num<beta_list[ii] for num in beta_list])/perioddaynum
-        zscore_list[ii] = betadist_list[ii]*beta_list[ii]*rsquared_list[ii]
-    if((zscore_list[1]<P) and (zscore_list[0]>P)):
-        modelcounter = 1
-        for ii in range(1, perioddaynum):
-            if(zscore_list[ii]<P):
-                modelcounter += 1
-        modelrange = (closingprice/closingprice_list[modelcounter]-1)*100
-        closingprice = float(stockdata_list[0][3])
-        maxprice = max([float(item[3]) for item in stockdata_list[:100]])
-        minprice = min([float(item[3]) for item in stockdata_list[:100]])
-        reboundrange = (closingprice-minprice)/(maxprice-minprice)*100
-        if((reboundrange<50) and (modelrange<0) and (modelcounter>5)):
-            return [stockinfo, stockdata_list[0][9], zscore_list[0], modelcounter, modelrange, beta_list[0], reboundrange]
+    betadist_list[0] = sum([num<beta_list[0] for num in beta_list])/perioddaynum
+    zscore_list[0] = betadist_list[0]*beta_list[0]*rsquared_list[0]
+    minprice_list = []
+    minoffset_list = []
+    maxprice_list = []
+    maxoffset_list = []
+    isDrop = True
+    for ii in reversed(range(1, perioddaynum)):
+        if(isDrop):
+            if(beta_list[ii-1]>P2):
+                minprice_list.insert(0, closingprice_list[ii])
+                minoffset_list.insert(0, ii)
+                isDrop=False
+        else:
+            if(beta_list[ii-1]<P1):
+                maxprice_list.insert(0, closingprice_list[ii])
+                maxoffset_list.insert(0, ii)
+                isDrop=True
+    if((len(minprice_list)>3) and (len(maxprice_list)>3) and (not isDrop) and (minoffset_list[0]<maxoffset_list[0]) and (beta_list[0]>P2)):
+        reboundcounter = minoffset_list[0]
+        reboundrange = (closingprice/minprice_list[0]-1)*100
+        failcounter = maxoffset_list[0]-minoffset_list[0]
+        failrange = (minprice_list[0]/maxprice_list[0]-1)*100
+        lastreboundcounter = minoffset_list[1]-maxoffset_list[0]
+        lastreboundrange = (maxprice_list[0]/minprice_list[1]-1)*100
+        lastfailcounter = maxoffset_list[1]-minoffset_list[1]
+        lastfailrange = (minprice_list[1]/maxprice_list[1]-1)*100
+        if(reboundrange<abs(failrange)/3):
+            return [stockinfo, stockdata_list[0][9], zscore_list[0], beta_list[0], rsquared_list[0], reboundrange, reboundcounter, failrange, failcounter, lastreboundrange, lastreboundcounter, lastfailrange, lastfailcounter]
     return []
 
 
@@ -3057,6 +3120,10 @@ def analyze_stockdata():
 #    vshape_Model_Select()
     vshape_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tvshape_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tparting_Model_Select Begin!")
+#    parting_Model_Select()
+    parting_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tparting_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tdrop_Model_Select Begin!")
 #    drop_Model_Select()
     drop_Model_Select_par()

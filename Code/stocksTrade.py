@@ -5,6 +5,7 @@ import tunet
 import time
 import math
 import numpy as np
+import statsmodels.api as sm
 
 
 tspro = ts.pro_api("119921ff45f95fd77e5d149cd1e64e78572712b3d0a5ce38157f255b")
@@ -93,7 +94,7 @@ def trade_analyze():
         elif(minprice<=float(tradeitem[5])):
             return ("\t突破箱体下沿提示 低位价格: " + str(tradeitem[5]) + "\n")
         else:
-            return ""
+            return ("")
 
 
     def grid_Model_Trade_pipeline(stockLastTradePrice, stockdata_list):
@@ -104,7 +105,62 @@ def trade_analyze():
         elif(minprice<=stockLastTradePrice*0.97):
             return ("\t跌3% 网格买入信号 买入价格: " + str(round(stockLastTradePrice*0.97,2)) + "\n")
         else:
-            return ""
+            return ("")
+
+
+    def parting_Model_Trade_pipeline(stockdata_list):
+        N = 2
+        closingprice = float(stockdata_list[0][3])
+        perioddaynum = min(400, len(stockdata_list)-N)
+        if(perioddaynum<10):
+            return ("")
+        closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N]]
+        upperprice_list = [float(item[4]) for item in stockdata_list[:perioddaynum+N]]
+        lowerprice_list = [float(item[5]) for item in stockdata_list[:perioddaynum+N]]
+        maxprice_list = []
+        minprice_list = []
+        maxoffset_list = []
+        minoffset_list = []
+        for ii in range(N, perioddaynum-1):
+            if(upperprice_list[ii]==max(upperprice_list[ii-N:ii+N+1])):
+                maxprice_list.append(upperprice_list[ii])
+                maxoffset_list.append(ii)
+            if(lowerprice_list[ii]==min(lowerprice_list[ii-N:ii+N+1])):
+                minprice_list.append(lowerprice_list[ii])
+                minoffset_list.append(ii)
+        if((len(minoffset_list)>3) and (len(maxoffset_list)>3)):
+            if(minoffset_list[0]==N):
+                return ("\t下分型买入信号 买入价格: " + str(round(minprice_list[0])) + "\n")
+            if(maxoffset_list[0]==N):
+                return ("\t上分型卖出信号 买入价格: " + str(round(maxprice_list[0])) + "\n")
+        return ("")
+
+
+    def RSRS_Model_Trade_pipeline(stockdata_list):
+        N = 18
+        P1 = 0.8
+        P2 = 1.0
+        closingprice = float(stockdata_list[0][3])
+        perioddaynum = min(10, len(stockdata_list)-N)
+        if(perioddaynum<10):
+            return ("")
+        closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N]]
+        upperprice_list = [float(item[4]) for item in stockdata_list[:perioddaynum+N]]
+        lowerprice_list = [float(item[5]) for item in stockdata_list[:perioddaynum+N]]
+        beta_list = [0]*perioddaynum
+        rsquared_list = [0]*perioddaynum
+        for ii in reversed(range(perioddaynum)):
+            model = sm.OLS(upperprice_list[ii:ii+N], sm.add_constant(lowerprice_list[ii:ii+N]))
+            modelfit = model.fit()
+            beta = modelfit.params[1]
+            r2 = modelfit.rsquared
+            beta_list[ii] = beta
+            rsquared_list[ii] = r2
+        if((beta_list[1]<P2) and (beta_list[0]>P2)):
+            return ("\tRSRS突破买入信号 买入价格: " + str(stockdata_list[0][3]) + "\n")
+        if((beta_list[1]>P1) and (beta_list[0]<P1)):
+            return ("\tRSRS突破卖出信号 卖出价格: " + str(stockdata_list[0][3]) + "\n")
+        return ("")
 
 
     def trend1T5_Model_Select_pipeline(stockdata_list):
@@ -113,7 +169,7 @@ def trade_analyze():
         closingprice = float(stockdata_list[0][3])
         perioddaynum = min(200, len(stockdata_list)-N2)
         if(perioddaynum<10):
-            return []
+            return ("")
         closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N2]]
         MA1_list = [0]*perioddaynum
         MA2_list = [0]*perioddaynum
@@ -134,15 +190,15 @@ def trade_analyze():
         parallelprice = (DIFF_list[0]+sum(closingprice_list[:N2-1])/N2-sum(closingprice_list[:N1-1])/N1)/(1/N1-1/N2)
         parallelrange = (parallelprice/closingprice-1)*100
         if((DIFF_list[0]>0) and (DIFF_list[1]<0)):
-            return "\t1日线上穿买入信号 买入价格: " + str(round(crossprice,2)) + "\n"
+            return ("\t1日线上穿买入信号 买入价格: " + str(round(crossprice,2)) + "\n")
         elif((DIFF_list[0]<0) and (DIFF_list[1]>0)):
-            return "\t1日线下穿卖出信号 卖出价格: " + str(round(crossprice,2)) + "\n"
+            return ("\t1日线下穿卖出信号 卖出价格: " + str(round(crossprice,2)) + "\n")
         elif((DIFF_list[0]>DIFF_list[1]) and (DIFF_list[1]<DIFF_list[2])):
-            return "\t1日线拐点买入信号 买入价格: " + str(round(parallelprice,2)) + "\n"
+            return ("\t1日线拐点买入信号 买入价格: " + str(round(parallelprice,2)) + "\n")
         elif((DIFF_list[0]<DIFF_list[1]) and (DIFF_list[1]>DIFF_list[2])):
-            return "\t1日线拐点卖出信号 卖出价格: " + str(round(parallelprice,2)) + "\n"
+            return ("\t1日线拐点卖出信号 卖出价格: " + str(round(parallelprice,2)) + "\n")
         else:
-            return ""
+            return ("")
         
 
     def MACD_Model_Trade_pipeline(stockdata_list):
@@ -152,7 +208,7 @@ def trade_analyze():
         closingprice = float(stockdata_list[0][3])
         perioddaynum = min(400, len(stockdata_list)-1)
         if(perioddaynum<10):
-            return ""
+            return ("")
         closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+1]]
         MACD_result = []
         DIFF_result = []
@@ -182,15 +238,15 @@ def trade_analyze():
         parallelprice = (MACD_list[0]/2*(N3+1)/(N3-1)+DEA_list[0]+(N2-1)/(N2+1)*EMA2_list[0]-(N1-1)/(N1+1)*EMA1_list[0])/(2/(N1+1)-2/(N2+1))
         parallelrange = (parallelprice/closingprice-1)*100
         if((MACD_list[1]<0) and (MACD_list[0]>0)):
-            return "\tMACD上穿买入信号 买入价格: " + str(round(crossprice,2)) + "\n"
+            return ("\tMACD上穿买入信号 买入价格: " + str(round(crossprice,2)) + "\n")
         elif((MACD_list[1]>0) and (MACD_list[0]<0)):
-            return "\tMACD下穿卖出信号 卖出价格: " + str(round(crossprice,2)) + "\n"
+            return ("\tMACD下穿卖出信号 卖出价格: " + str(round(crossprice,2)) + "\n")
         elif((MACD_list[1]<MACD_list[2]) and (MACD_list[1]<MACD_list[0])):
-            return "\tMACD拐点买入信号 买入价格: " + str(round(parallelprice,2)) + "\n"
+            return ("\tMACD拐点买入信号 买入价格: " + str(round(parallelprice,2)) + "\n")
         elif((MACD_list[1]>MACD_list[2]) and (MACD_list[1]>MACD_list[0])):
-            return "\tMACD拐点卖出信号 卖出价格: " + str(round(parallelprice,2)) + "\n"
+            return ("\tMACD拐点卖出信号 卖出价格: " + str(round(parallelprice,2)) + "\n")
         else:
-            return ""
+            return ("")
 
 
     def KDJ_Model_Trade_pipeline(stockdata_list):
@@ -198,7 +254,7 @@ def trade_analyze():
         closingprice = float(stockdata_list[0][3])
         perioddaynum = min(400, len(stockdata_list)-N)
         if(perioddaynum<10):
-            return ""
+            return ("")
         closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N]]
         upperprice_list = [float(item[4]) for item in stockdata_list[:perioddaynum+N]]
         lowerprice_list = [float(item[5]) for item in stockdata_list[:perioddaynum+N]]
@@ -228,15 +284,15 @@ def trade_analyze():
         Kprice = (H9-L9)*K_list[0]/100+L9
         Krange = (Kprice/closingprice-1)*100
         if((DIFF_list[1]<0) and (DIFF_list[0]>0)):
-            return "\tKDJ上穿买入信号 买入价格: " + str(round(Kprice,2)) + "\n"
+            return ("\tKDJ上穿买入信号 买入价格: " + str(round(Kprice,2)) + "\n")
         elif((DIFF_list[1]>0) and (DIFF_list[0]<0)):
-            return "\tKDJ下穿卖出信号 卖出价格: " + str(round(Kprice,2)) + "\n"
+            return ("\tKDJ下穿卖出信号 卖出价格: " + str(round(Kprice,2)) + "\n")
         elif((DIFF_list[1]<DIFF_list[2]) and (DIFF_list[1]<DIFF_list[0])):
-            return "\tKDJ拐点买入信号 买入价格: " + str(round(Kprice,2)) + "\n"
+            return ("\tKDJ拐点买入信号 买入价格: " + str(round(Kprice,2)) + "\n")
         elif((DIFF_list[1]>DIFF_list[2]) and (DIFF_list[1]>DIFF_list[0])):
-            return "\tKDJ拐点卖出信号 卖出价格: " + str(round(Kprice,2)) + "\n"
+            return ("\tKDJ拐点卖出信号 卖出价格: " + str(round(Kprice,2)) + "\n")
         else:
-            return ""
+            return ("")
 
 
     def DMI_Model_Trade_pipeline(stockdata_list):
@@ -245,7 +301,7 @@ def trade_analyze():
         closingprice = float(stockdata_list[0][3])
         perioddaynum = min(400, len(stockdata_list)-N1-1)
         if(perioddaynum<10):
-            return [], []
+            return ("")
         closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N1+1]]
         upperprice_list = [float(item[4]) for item in stockdata_list[:perioddaynum+N1+1]]
         lowerprice_list = [float(item[5]) for item in stockdata_list[:perioddaynum+N1+1]]
@@ -288,15 +344,13 @@ def trade_analyze():
             DX_list[ii] = DX
             MADX_list[ii] = MADX
         if((DMI_list[1]<0) and (DMI_list[0]>0)):
-            return "\tDMI上穿买入信号 买入价格: " + stockdata_list[0][3] + "\n"
+            return ("\tDMI上穿买入信号 买入价格: " + stockdata_list[0][3] + "\n")
         elif((DMI_list[1]>0) and (DMI_list[0]<0)):
-            return "\tDMI下穿卖出信号 卖出价格: " + stockdata_list[0][3] + "\n"
-        elif((MADX_list[1]<MADX_list[2]) and (MADX_list[1]<MADX_list[0])):
-            return "\tADX拐点反转信号 买入价格: " + stockdata_list[0][3] + "\n"
-        elif((MADX_list[1]>MADX_list[2]) and (MADX_list[1]>MADX_list[0])):
-            return "\tADX拐点反转信号 卖出价格: " + stockdata_list[0][3] + "\n"
+            return ("\tDMI下穿卖出信号 卖出价格: " + stockdata_list[0][3] + "\n")
+        elif(((MADX_list[1]<MADX_list[2]) and (MADX_list[1]<MADX_list[0])) or ((MADX_list[1]>MADX_list[2]) and (MADX_list[1]>MADX_list[0]))):
+            return ("\tADX拐点反转信号 信号价格: " + stockdata_list[0][3] + "\n")
         else:
-            return ""
+            return ("")
 
 
     def EMV_Model_Trade_pipeline(stockdata_list):
@@ -305,7 +359,7 @@ def trade_analyze():
         closingprice = float(stockdata_list[0][3])
         perioddaynum = min(400, len(stockdata_list)-1)
         if(perioddaynum<10):
-            return ""
+            return ("")
         EMV_result = []
         EMVMACD_result = []
         EMV_list = [0]*(perioddaynum+1)
@@ -325,15 +379,16 @@ def trade_analyze():
             MAEMV_list[ii] = MAEMV
             EMVDIFF_list[ii] = EMVDIFF
         if((EMV_list[1]<0) and (EMV_list[0]>0)):
-            return "\tEMV上穿买入信号 买入价格: " + stockdata_list[0][3] + "\n"
+            return ("\tEMV上穿买入信号 买入价格: " + stockdata_list[0][3] + "\n")
         elif((EMV_list[1]>0) and (EMV_list[0]<0)):
-            return "\tEMV下穿卖出信号 卖出价格: " + stockdata_list[0][3] + "\n"
+            return ("\tEMV下穿卖出信号 卖出价格: " + stockdata_list[0][3] + "\n")
         elif((EMVDIFF_list[1]<0) and (EMVDIFF_list[0]>0)):
-            return "\tEMV拐点买入信号 买入价格: " + stockdata_list[0][3] + "\n"
+            return ("\tEMV拐点买入信号 买入价格: " + stockdata_list[0][3] + "\n")
         elif((EMVDIFF_list[1]>0) and (EMVDIFF_list[0]<0)):
-            return "\tEMV拐点卖出信号 卖出价格: " + stockdata_list[0][3] + "\n"
+            return ("\tEMV拐点卖出信号 卖出价格: " + stockdata_list[0][3] + "\n")
         else:
-            return ""
+            return ("")
+
 
     def wave_Model_Trade_pipeline(stockdata_list):
         closingprice = float(stockdata_list[0][3])
@@ -397,10 +452,10 @@ def trade_analyze():
             maxprice = max(closingprice_list[:minoffset_list[0]])
             retracerange = (closingprice/maxprice-1)*100
             if(reboundrange<5):
-                return "\twave低点买入信号 买入价格: " + str(round(minprice_list[0],2)) + "\n"
+                return ("\twave低点买入信号 买入价格: " + str(round(minprice_list[0],2)) + "\n")
             elif(retracerange<-5):
-                return "\twave回撤卖出信号 卖出价格: " + str(round(maxprice,2)) + "\n"
-        return ""
+                return ("\twave回撤卖出信号 卖出价格: " + str(round(maxprice,2)) + "\n")
+        return ("")
 
     resultstr = ""
     title, trade_list = read_csvfile(accountbook_path)
@@ -419,6 +474,8 @@ def trade_analyze():
             resultstr = resultstr + stockinfo + " 当前价格:" + str(stockdata_list[0][3]) + "\n"
             resultstr = resultstr + wave_Model_Trade_pipeline(stockdata_list) \
                                   + grid_Model_Trade_pipeline(float(trade_list[ii][3]), stockdata_list) \
+                                  + parting_Model_Trade_pipeline(stockdata_list) \
+                                  + RSRS_Model_Trade_pipeline(stockdata_list) \
                                   + MACD_Model_Trade_pipeline(stockdata_list) \
                                   + KDJ_Model_Trade_pipeline(stockdata_list) \
                                   + DMI_Model_Trade_pipeline(stockdata_list) \
