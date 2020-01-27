@@ -73,12 +73,18 @@ def gen_163code(stockcode):
 
 
 def isMarketOpen():
-    df = tspro.trade_cal(exchange='', start_date=day_time, end_date=day_time)
-    df_list = df.values.tolist()
-    if(df_list[0][2]==1):
-        return True
-    else:
-        return False
+    for ii in range(3):
+        try:
+            df = tspro.trade_cal(exchange='', start_date=day_time, end_date=day_time)
+            df_list = df.values.tolist()
+            if(df_list[0][2]==1):
+                return True
+            break
+        except Exception as e:
+            print(e)
+            time.sleep(600)
+    return False
+
 
 def get_realtimedata(filename):
     title = ["code", "name", "changepercent", "trade", "open", "high", "low", "settlement", "volumn", "turnoverratio", "amount", "per", "pb", "mktcap", "nmc"]

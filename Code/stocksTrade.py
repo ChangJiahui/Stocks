@@ -449,7 +449,7 @@ def trade_analyze():
             failcounter = maxoffset_list[0]-minoffset_list[0]
             reboundrange = (closingprice/minprice_list[0]-1)*100
             reboundcounter = minoffset_list[0]
-            maxprice = max(closingprice_list[:minoffset_list[0]])
+            maxprice = max(closingprice_list[:(minoffset_list[0]+1)])
             retracerange = (closingprice/maxprice-1)*100
             if(reboundrange<5):
                 return ("\twave低点买入信号 买入价格: " + str(round(minprice_list[0],2)) + "\n")

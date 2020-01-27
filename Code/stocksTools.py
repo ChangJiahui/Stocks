@@ -17,7 +17,7 @@ import xlrd
 import multiprocessing
 import tunet
 import urllib
-from scipy.stats import pearsonr
+import scipy.stats as scistats
 import shutil
 
 
@@ -269,6 +269,67 @@ def block_Model_Select():
     write_csvfile(resultfile_path, title, resultdata_list)
 
 
+
+
+def similar_Model_Select():
+# K 线相似度比较
+    resultfile_path = os.path.join(resultdata_path, "similar_Model_Select_Result.csv")
+    title = ["股票名称", "当前股票最大相似度", "当前未来五日涨跌幅", "当前相似日期", "所有股票最大相似度", "所有未来五日涨跌幅", "相似股票名称", "相似日期", "当前未来1日预测", "当前未来2日预测", "当前未来3日预测", "当前未来4日预测", "当前未来5日预测", "所有未来1日预测", "所有未来2日预测", "所有未来3日预测", "所有未来4日预测", "所有未来5日预测"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(similar_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def similar_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "similar_Model_Select_Result.csv")
+    title = ["股票名称", "当前股票最大相似度", "当前未来五日涨跌幅", "当前相似日期", "所有股票最大相似度", "所有未来五日涨跌幅", "相似股票名称", "相似日期", "当前未来1日预测", "当前未来2日预测", "当前未来3日预测", "当前未来4日预测", "当前未来5日预测", "所有未来1日预测", "所有未来2日预测", "所有未来3日预测", "所有未来4日预测", "所有未来5日预测"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(similar_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def similar_Model_Select_pipeline(filename):
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    selfsimidate = ""
+    if(len(stockdata_list)<100):
+        return []
+    ref_list = [float(item[3]) for item in stockdata_list[:30]]
+    maxselfsimidegree = 0
+    selfprerange = 0
+    selfprerange_list = [0, 0, 0, 0, 0]
+    for ii in range(75, min(125, len(stockdata_list)-30)):
+        closingprice_list = [float(item[3]) for item in stockdata_list[ii:(ii+30)]]
+        simidegree, _ = scistats.pearsonr(closingprice_list,ref_list)
+        if(simidegree>maxselfsimidegree):
+            maxselfsimidegree = simidegree
+            selfsimidate = stockdata_list[ii][0]
+            selfprerange_list = list(reversed([float(item[9]) for item in stockdata_list[(ii-5):ii]]))
+            selfprerange = sum(selfprerange_list)
+    maxallsimidegree = 0
+    allprerange = 0
+    allprerange_list = [0, 0, 0, 0, 0]
+    allsimidate = ""
+    simistockinfo = ""
+    filename2_list = os.listdir(stockdata_path)
+    filename2_list.remove(filename)
+    for filename2 in filename2_list:
+        if(filename2.split('-')[0]!=filename.split('-')[0]):
+            continue
+        _, stockdata2_list = read_csvfile(os.path.join(stockdata_path, filename2))
+        if(len(stockdata2_list)<100):
+            continue
+        for ii in range(5, 10):
+            closingprice_list = [float(item[3]) for item in stockdata2_list[ii:(ii+30)]]
+            simidegree, _ = scistats.pearsonr(closingprice_list, ref_list)
+            if(simidegree>maxallsimidegree):
+                maxallsimidegree = simidegree
+                simistockinfo = filename2.split(".")[0]
+                allsimidate = stockdata2_list[ii][0]
+                allprerange_list = list(reversed([float(item[9]) for item in stockdata2_list[(ii-5):ii]])) 
+                allprerange = sum(allprerange_list)
+    return [stockinfo, maxselfsimidegree, selfprerange, selfsimidate, maxallsimidegree, allprerange, simistockinfo, allsimidate] + selfprerange_list + allprerange_list
+
+
 def clear_data():
     if(not os.path.exists(toolsdata_path)):
         os.mkdir(toolsdata_path)
@@ -355,6 +416,10 @@ def analyze_stockdata():
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tholders_Model_Select Begin!")
     holders_Model_Select()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tholders_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tsimilar_Model_Select Begin!")
+##    similar_Model_Select()
+    similar_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tsimilar_Model_Select Finished!")
 
 
 def main():
@@ -374,5 +439,4 @@ def main():
 
 
 if __name__=="__main__":
-#    main()
-    summary_result_par()
+    main()

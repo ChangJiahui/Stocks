@@ -179,12 +179,17 @@ def get_fundinfo():
 
 
 def isMarketOpen():
-    df = tspro.trade_cal(exchange='', start_date=end_time, end_date=end_time)
-    df_list = df.values.tolist()
-    if(df_list[0][2]==1):
-        return True
-    else:
-        return False
+    for ii in range(3):
+        try:
+            df = tspro.trade_cal(exchange='', start_date=end_time, end_date=end_time)
+            df_list = df.values.tolist()
+            if(df_list[0][2]==1):
+                return True
+            break
+        except Exception as e:
+            print(e)
+            time.sleep(600)
+    return False
 
 
 def EHBF_Analyze():
@@ -368,7 +373,7 @@ def MACDDIFF_Model_Select_pipeline(filename, N1, N2, N3):
     _, funddata_list = read_csvfile(os.path.join(funddata_path, filename))
     fundinfo = filename[:filename.rfind(".")]
     closingprice = float(funddata_list[0][4])
-    perioddaynum = min(400, len(funddata_list)-1)
+    perioddaynum = min(500, len(funddata_list)-1)
     if(perioddaynum<200):
         return [], []
     closingprice_list = [float(item[4]) for item in funddata_list[:perioddaynum+1]]
@@ -439,7 +444,7 @@ def MACDDIFF_Model_Select_pipeline(filename, N1, N2, N3):
                     if(maxmodel_range>tempmodel_range):
                         maxmodel_range = tempmodel_range
                     break
-        if(model_range<maxmodel_range/2):
+        if(model_range<maxmodel_range*2/3):
             MACD_result = [fundinfo, model_predict, model_counter, model_range, model_slope, DEA, DEAratio, round(cross_range,2), round(trend_range,2), round(parallel_range,2), maxmodel_counter, maxmodel_range, minDEA, minDEAdate, minDEAratio, minDEAratiodate]
     if((DIFF_list[1]<0) and (DIFF_list[0]>DIFF_list[1])):
         model_counter = 1
@@ -482,7 +487,7 @@ def MACDDIFF_Model_Select_pipeline(filename, N1, N2, N3):
                     if(maxmodel_range>tempmodel_range):
                         maxmodel_range = tempmodel_range
                     break
-        if(model_range<maxmodel_range/2):
+        if(model_range<maxmodel_range*2/3):
             DIFF_result = [fundinfo, model_predict, model_counter, model_range, model_slope, DEA, DEAratio, round(cross_range,2), round(trend_range,2), round(parallel_range,2), maxmodel_counter, maxmodel_range, minDEA, minDEAdate, minDEAratio, minDEAratiodate]
     return MACD_result, DIFF_result
 
