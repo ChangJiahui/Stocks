@@ -2380,32 +2380,39 @@ def margin_Model_Select():
 def block_Model_Select():
 # 大宗交易数据
     resultfile_path = os.path.join(resultdata_path, "block_Model_Select_Result.csv")
-    title = ["股票名称", "交易日历", "交易价格", "交易溢价率", "成交量(万股)", "交易换手率", "当日换手率", "成交金额", "买方营业部", "卖方营业部"]
+    title = ["股票名称", "交易日期", "交易溢价率(%)", "交易后最大涨幅(%)", "交易后最大跌幅(%)", "交易换手率(%)", "交易/当日量比", "交易/今日量比", "成交金额(万元)", "买方营业部", "卖方营业部"]
     resultdata_list = []
     block_list = []
     for ii in range(3):
         try:
+            time.sleep(1)
             block_df = tspro.block_trade(start_date=start_time, end_date=end_time)
-            block_df = block_df.dropna(axis=0, how='any', thresh=None, subset=None,inplace=True)
+            block_df.dropna(axis=0, how='any', thresh=None, subset=None, inplace=True)
             block_list = block_df.values.tolist()
+            break
         except Exception as e:
             print(e)
             time.sleep(600)
-    for item in block_list:
-        if((item[0][:3]!="300") and (item[-2][:4]!=item[-1][:4])):
-            item_list = list(item)
+    for ii in range(len(block_list)):
+        if((block_list[ii][0][:3]!="300") and (block_list[ii][-2][:4]!=block_list[ii][-1][:4])):
             for filename in os.listdir(stockdata_path):
                 stockinfo = filename.split(".")[0]
-                if(item_list[0][:6]==stockinfo[-6:]):
+                if(block_list[ii][0][:6]==stockinfo[-6:]):
                     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
-                    item_list[0] = stockinfo
-                    closingprice = stockdata_list[0][3]
-                    convpre = (float(item_list[2])/float(closingprice)-1)*100
-                    item_list.insert(3, convpre)
-                    item_list.insert(5, float(stockdata_list[0][10])*float(item_list[4])*10000/float(stockdata_list[0][11]))
-                    item_list.insert(6, stockdata_list[0][10])
-                    if((convpre>=-5) and ("ST" not in item_list[0])):
-                        resultdata_list.append(item_list)
+                    block_list[ii][1] = block_list[ii][1][0:4] + '-' + block_list[ii][1][4:6] + '-' + block_list[ii][1][6:8]
+                    blockoffset = 0
+                    for jj in range(len(stockdata_list)):
+                        if(stockdata_list[jj][0]==block_list[ii][1]):
+                            blockoffset = jj
+                            break
+                    closingprice_list = [float(item[3]) for item in stockdata_list[:(blockoffset+1)]]
+                    convpre = (float(block_list[ii][2])/closingprice_list[blockoffset]-1)*100
+                    volumnratio1 = (float(block_list[ii][4])*10000/float(stockdata_list[blockoffset][11]))
+                    tradevolumn = volumnratio1*float(stockdata_list[blockoffset][10])
+                    volumnratio2 = tradevolumn/float(stockdata_list[0][10])
+                    riserange = (max(closingprice_list)/closingprice_list[blockoffset]-1)*100
+                    failrange = (min(closingprice_list)/closingprice_list[blockoffset]-1)*100
+                    resultdata_list.append([stockinfo, stockdata_list[blockoffset][0], convpre, riserange, failrange, tradevolumn, volumnratio1, volumnratio2, block_list[ii][4], block_list[ii][5], block_list[ii][6]])
                     break
     write_csvfile(resultfile_path, title, resultdata_list)
 
