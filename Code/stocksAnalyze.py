@@ -204,7 +204,7 @@ def get_YahooHKdata(stockHcode, start_time, end_time, filename):
                     if(np.isnan(prices_list[ii][1:5]).all()):
                         prices_list.pop(ii)
                     else:
-                        prices_list[ii] = prices_list[ii][:6] + [(prices_list[ii][1]/prices_list[ii+1][1]-1)*100]                        
+                        prices_list[ii] = prices_list[ii][:6] + [(prices_list[ii][1]/prices_list[ii+1][1]-1)*100]
             write_csvfile(filename, title, prices_list)
             return True
     return False
@@ -816,25 +816,25 @@ def parting_Model_Select_pipeline(filename):
 
 
 def RSRS_Model_Select():
-# RSRS择时模型
+# RSRS历史择时模型
     resultfile_path = os.path.join(resultdata_path, "RSRS_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "RSRS因子", "beta值", "rsquared", "最近多头幅度", "最近多头天数", "最近空头幅度", "最近空头天数", "上一多头幅度", "上一多头天数", "上一空头幅度", "上一空头天数"]
+    title = ["股票名称", "当日涨跌幅", "RSRS因子", "beta分位", "rsquared", "最近多头幅度", "最近多头天数", "最近空头幅度", "最近空头天数", "上一多头幅度", "上一多头天数", "上一空头幅度", "上一空头天数"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         resultdata_list.append(RSRS_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
 def RSRS_Model_Select_par():
     resultfile_path = os.path.join(resultdata_path, "RSRS_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "RSRS因子", "beta值", "rsquared", "最近多头幅度", "最近多头天数", "最近空头幅度", "最近空头天数", "上一多头幅度", "上一多头天数", "上一空头幅度", "上一空头天数"]
+    title = ["股票名称", "当日涨跌幅", "RSRS因子", "beta分位", "rsquared", "最近多头幅度", "最近多头天数", "最近空头幅度", "最近空头天数", "上一多头幅度", "上一多头天数", "上一空头幅度", "上一空头天数"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(RSRS_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
     pool.join()
     write_csvfile(resultfile_path, title, resultdata_list)
 def RSRS_Model_Select_pipeline(filename):
-    N = 18
-    P1 = 0.8
-    P2 = 1.0
+    N = 16
+    P1 = 0.1
+    P2 = 0.9
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     closingprice = float(stockdata_list[0][3])
@@ -848,6 +848,7 @@ def RSRS_Model_Select_pipeline(filename):
     betadist_list = [0]*perioddaynum
     rsquared_list = [0]*perioddaynum
     zscore_list = [0]*perioddaynum
+    zscoredist_list = [0]*perioddaynum
     for ii in reversed(range(perioddaynum)):
         model = sm.OLS(upperprice_list[ii:ii+N], sm.add_constant(lowerprice_list[ii:ii+N]))
         modelfit = model.fit()
@@ -855,8 +856,13 @@ def RSRS_Model_Select_pipeline(filename):
         r2 = modelfit.rsquared
         beta_list[ii] = beta
         rsquared_list[ii] = r2
-    betadist_list[0] = sum([num<beta_list[0] for num in beta_list])/perioddaynum
-    zscore_list[0] = betadist_list[0]*beta_list[0]*rsquared_list[0]
+        zscore_list[ii] = beta*r2
+    betasort_list = sorted(beta_list)
+    for ii in range(perioddaynum):
+        betadist_list[ii] = betasort_list.index(beta_list[ii])/perioddaynum
+    zscoresort_list = sorted(zscore_list)
+    for ii in range(perioddaynum):
+        zscoredist_list[ii] = zscoresort_list.index(zscore_list[ii])/perioddaynum
     minprice_list = []
     minoffset_list = []
     maxprice_list = []
@@ -864,16 +870,16 @@ def RSRS_Model_Select_pipeline(filename):
     isDrop = True
     for ii in reversed(range(1, perioddaynum)):
         if(isDrop):
-            if(beta_list[ii-1]>P2):
+            if(zscoredist_list[ii-1]>P2):
                 minprice_list.insert(0, closingprice_list[ii])
                 minoffset_list.insert(0, ii)
                 isDrop=False
         else:
-            if(beta_list[ii-1]<P1):
+            if(zscoredist_list[ii-1]<P1):
                 maxprice_list.insert(0, closingprice_list[ii])
                 maxoffset_list.insert(0, ii)
                 isDrop=True
-    if((len(minprice_list)>3) and (len(maxprice_list)>3) and (not isDrop) and (minoffset_list[0]<maxoffset_list[0]) and (beta_list[0]>P2)):
+    if((len(minprice_list)>3) and (len(maxprice_list)>3) and (not isDrop) and (minoffset_list[0]<maxoffset_list[0]) and (zscoredist_list[0]>P2)):
         reboundcounter = minoffset_list[0]
         reboundrange = (closingprice/minprice_list[0]-1)*100
         failcounter = maxoffset_list[0]-minoffset_list[0]
@@ -882,8 +888,73 @@ def RSRS_Model_Select_pipeline(filename):
         lastreboundrange = (maxprice_list[0]/minprice_list[1]-1)*100
         lastfailcounter = maxoffset_list[1]-minoffset_list[1]
         lastfailrange = (minprice_list[1]/maxprice_list[1]-1)*100
-        if(reboundrange<abs(failrange)/3):
-            return [stockinfo, stockdata_list[0][9], zscore_list[0], beta_list[0], rsquared_list[0], reboundrange, reboundcounter, failrange, failcounter, lastreboundrange, lastreboundcounter, lastfailrange, lastfailcounter]
+        if(reboundrange<20):
+            return [stockinfo, stockdata_list[0][9], zscore_list[0], betadist_list[0], rsquared_list[0], reboundrange, reboundcounter, failrange, failcounter, lastreboundrange, lastreboundcounter, lastfailrange, lastfailcounter]
+    return []
+
+
+def obv_Model_Select():
+# 成交量放大历史择时模型
+    resultfile_path = os.path.join(resultdata_path, "obv_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "obv历史分位", "最近放量幅度", "最近放量天数", "最近缩量幅度", "最近缩量天数", "上一放量幅度", "上一放量天数", "上一缩量幅度", "上一缩量天数"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(obv_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def obv_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "obv_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "obv历史分位", "最近放量幅度", "最近放量天数", "最近缩量幅度", "最近缩量天数", "上一放量幅度", "上一放量天数", "上一缩量幅度", "上一缩量天数"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(obv_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def obv_Model_Select_pipeline(filename):
+    N = 10
+    P1 = 0.2
+    P2 = 0.8
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    closingprice = float(stockdata_list[0][3])
+    perioddaynum = min(1000, len(stockdata_list)-N)
+    if(perioddaynum<300):
+        return []
+    closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N]]
+    obv_list = [float(item[10]) for item in stockdata_list[:perioddaynum+N]]
+    obvN_list = [0]*perioddaynum
+    obvdist_list = [0]*perioddaynum
+    for ii in range(perioddaynum):
+        obvN_list[ii] = sum(obv_list[ii:ii+N])
+    obvsort_list = sorted(obvN_list)
+    for ii in range(perioddaynum):
+        obvdist_list[ii] = obvsort_list.index(obvN_list[ii])/perioddaynum
+    minprice_list = []
+    minoffset_list = []
+    maxprice_list = []
+    maxoffset_list = []
+    isDrop = True
+    for ii in reversed(range(1, perioddaynum)):
+        if(isDrop):
+            if(obvdist_list[ii-1]>P2):
+                minprice_list.insert(0, closingprice_list[ii])
+                minoffset_list.insert(0, ii)
+                isDrop=False
+        else:
+            if(obvdist_list[ii-1]<P1):
+                maxprice_list.insert(0, closingprice_list[ii])
+                maxoffset_list.insert(0, ii)
+                isDrop=True
+    if((len(minprice_list)>3) and (len(maxprice_list)>3) and (obvdist_list[0]>P2)):
+        reboundcounter = minoffset_list[0]
+        reboundrange = (closingprice/minprice_list[0]-1)*100
+        failcounter = maxoffset_list[0]-minoffset_list[0]
+        failrange = (minprice_list[0]/maxprice_list[0]-1)*100
+        lastreboundcounter = minoffset_list[1]-maxoffset_list[0]
+        lastreboundrange = (maxprice_list[0]/minprice_list[1]-1)*100
+        lastfailcounter = maxoffset_list[1]-minoffset_list[1]
+        lastfailrange = (minprice_list[1]/maxprice_list[1]-1)*100
+        if(reboundrange<20):
+            return [stockinfo, stockdata_list[0][9], obvdist_list[0], reboundrange, reboundcounter, failrange, failcounter, lastreboundrange, lastreboundcounter, lastfailrange, lastfailcounter]
     return []
 
 
@@ -1085,7 +1156,7 @@ def volumn_Model_Select_pipeline(filename):
 
 def tangle_Model_Select():
 # 1-5-10-30-60日线纠缠
-    title = ["股票名称", "当日涨跌幅", "百日位置(%)", "日线纠缠幅度", "日线纠缠天数", "日线偏离幅度", "日线偏离天数", "上一日线纠缠幅度", "上一日线纠缠天数", "上一日线偏离幅度", "上一日线偏离天数"]
+    title = ["股票名称", "当日涨跌幅", "百日位置(%)", "日线纠缠幅度", "日线纠缠天数", "日线偏离幅度", "日线偏离天数"]
     resultfile_path = os.path.join(resultdata_path, "tangle_Model_Select_Result.csv")
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
@@ -1105,7 +1176,7 @@ def tangle_Model_Select_pipeline(filename):
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     closingprice = float(stockdata_list[0][3])
-    perioddaynum = min(500, len(stockdata_list)-max(N_list))
+    perioddaynum = min(1000, len(stockdata_list)-max(N_list))
     if(perioddaynum<100):
         return []
     closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+max(N_list)]]
@@ -1115,9 +1186,10 @@ def tangle_Model_Select_pipeline(filename):
     for ii in range(perioddaynum):
         for jj in range(len(N_list)):
             MA_list[ii][jj]=np.mean(closingprice_list[ii:ii+N_list[jj]])
-        div_list[ii] = 1-min(MA_list[ii])/max(MA_list[ii])
+        div_list[ii] = 2*(max(MA_list[ii])-min(MA_list[ii]))/(max(MA_list[ii])+min(MA_list[ii]))
+    divsort_list = sorted(div_list)
     for ii in range(perioddaynum):
-        divdist_list[ii] = sum([num<div_list[ii] for num in div_list])/perioddaynum
+        divdist_list[ii] = divsort_list.index(div_list[ii])/perioddaynum
     if(divdist_list[0]<P):
         tanglecounter = 1
         for ii in range(1,perioddaynum):
@@ -1139,7 +1211,6 @@ def tangle_Model_Select_pipeline(filename):
         if((divrange<0) and (reboundrange<50)):
             return [stockinfo, stockdata_list[0][9], reboundrange, tanglerange, tanglecounter, divrange, divcounter]
     return []
-
 
 
 def trend_Model_Select():
@@ -1356,6 +1427,62 @@ def KDJ_Model_Select_pipeline(filename):
                     break
         if(modelrange<maxmodelrange*2/3):
             return [stockinfo, stockdata_list[0][9], modelpredict, modelcounter, modelrange, modelslope, round(Krange,2), K_list[0], D_list[0], J_list[0], RSV, maxmodelcounter, maxmodelrange, minJ, minJdate, maxJ, maxJdate]
+    return []
+
+
+def PVI_Model_Select():
+# PVI 正交易量模型
+    resultfile_path = os.path.join(resultdata_path, "PVI_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "PVI上方天数", "PVI上方涨跌幅", "PVI下方天数", "PVI下方涨跌幅"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(PVI_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def PVI_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "PVI_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "PVI上方天数", "PVI上方涨跌幅", "PVI下方天数", "PVI下方涨跌幅"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(PVI_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def PVI_Model_Select_pipeline(filename):
+    N = 72
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    closingprice = float(stockdata_list[0][3])
+    perioddaynum = min(1000, len(stockdata_list)-1)
+    if(perioddaynum<200):
+        return []
+    closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+1]]
+    obv_list = [float(item[10]) for item in stockdata_list[:perioddaynum+1]]
+    PVI_list = [1]*(perioddaynum+1)
+    MAPVI_list = [1]*(perioddaynum+1)
+    DIFF_list = [0]*perioddaynum
+    for ii in reversed(range(perioddaynum)):
+        if(obv_list[ii]/obv_list[ii+1]>1):
+            PVI_list[ii] = PVI_list[ii+1]*(closingprice_list[ii]/closingprice_list[ii+1])
+        else:
+            PVI_list[ii] = PVI_list[ii+1]
+        MAPVI_list[ii] = (N-1)/(N+1)*MAPVI_list[ii+1] + 2/(N+1)*PVI_list[ii]
+        DIFF_list[ii] = PVI_list[ii]-MAPVI_list[ii]
+    if(DIFF_list[0]>0):
+        reboundcounter = 1
+        for ii in range(1,perioddaynum):
+            if(DIFF_list[ii]>0):
+                reboundcounter+=1
+            else:
+                break
+        reboundrange = (closingprice/closingprice_list[reboundcounter]-1)*100
+        failcounter = 0
+        for ii in range(reboundcounter, perioddaynum):
+            if(DIFF_list[ii]>0):
+                break
+            else:
+                failcounter+=1
+        failrange = (closingprice_list[reboundcounter]/closingprice_list[reboundcounter+failcounter]-1)*100
+        if((failrange<0) and (reboundrange<abs(failrange)/3)):
+            return [stockinfo, stockdata_list[0][9], reboundcounter, reboundrange, failcounter, failrange]
     return []
 
 
@@ -1829,7 +1956,7 @@ def DMI_Model_Select_pipeline(filename):
     return DMI_result, ADX_result
 
 
-def obv_Model_Select():
+def obvMACD_Model_Select():
 # OBV模型+多空净额比率法修正+MACD 模型 & DIFF 模型
     resultfile_path1 = os.path.join(resultdata_path, "obvMACD_Model_Select_Result.csv")
     resultfile_path2 = os.path.join(resultdata_path, "obvDIFF_Model_Select_Result.csv")
@@ -1838,23 +1965,23 @@ def obv_Model_Select():
     resultdata_list1 = []
     resultdata_list2 = []
     for filename in os.listdir(stockdata_path):
-        OBVMACD_result, OBVDIFF_result = obv_Model_Select_pipeline(filename)
+        OBVMACD_result, OBVDIFF_result = obvMACD_Model_Select_pipeline(filename)
         resultdata_list1.append(OBVMACD_result)
         resultdata_list2.append(OBVDIFF_result)
     write_csvfile(resultfile_path1, title1, resultdata_list1)
     write_csvfile(resultfile_path2, title2, resultdata_list2)
-def obv_Model_Select_par():
+def obvMACD_Model_Select_par():
     resultfile_path1 = os.path.join(resultdata_path, "obvMACD_Model_Select_Result.csv")
     resultfile_path2 = os.path.join(resultdata_path, "obvDIFF_Model_Select_Result.csv")
     title1 = ["股票名称", "当日涨跌幅", "估算obvMACD贯穿天数", "obvMACD下方天数", "上穿前总跌幅", "obvMACD斜率", "百日最大下方天数", "百日最大上穿前跌幅", "当日obvDEA比例", "百日最小obvDEA比例", "日期"]
     title2 = ["股票名称", "当日涨跌幅", "估算obvDIFF贯穿天数", "obvDIFF下方天数", "上穿前总跌幅", "obvDIFF斜率", "百日最大下方天数", "百日最大上穿前跌幅", "当日obvDEA比例", "百日最小obvDEA比例", "日期"]
     pool = multiprocessing.Pool(4)
-    resultdata_list = pool.map(obv_Model_Select_pipeline, os.listdir(stockdata_path))
+    resultdata_list = pool.map(obvMACD_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
     pool.join()
     write_csvfile(resultfile_path1, title1, [item[0] for item in resultdata_list])
     write_csvfile(resultfile_path2, title2, [item[1] for item in resultdata_list])
-def obv_Model_Select_pipeline(filename):
+def obvMACD_Model_Select_pipeline(filename):
     N1 = 12
     N2 = 26
     N3 = 9
@@ -3176,6 +3303,10 @@ def analyze_stockdata():
 #    KDJ_Model_Select()
     KDJ_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tKDJ_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tPVI_Model_Select Begin!")
+#    PVI_Model_Select()
+    PVI_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tPVI_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tEMV_Model_Select Begin!")
 #    EMV_Model_Select()
     EMV_Model_Select_par()
@@ -3192,6 +3323,10 @@ def analyze_stockdata():
 #    obv_Model_Select()
     obv_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tobv_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tobvMACD_Model_Select Begin!")
+#    obvMACD_Model_Select()
+    obvMACD_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tobvMACD_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tlagging_Model_Select Begin!")
 #    lagging_Model_Select()
     lagging_Model_Select_par()
@@ -3224,9 +3359,9 @@ def analyze_stockdata():
 #    KDJMonth_Model_Select()
     KDJMonth_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tKDJMonth_Model_Select Finished!")
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tAHCom_Model_Select Begin!")
-    AHCom_Model_Select()
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tAHCom_Model_Select Finished!")
+#    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tAHCom_Model_Select Begin!")
+#    AHCom_Model_Select()
+#    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tAHCom_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tABCom_Model_Select Begin!")
     ABCom_Model_Select()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tABCom_Model_Select Finished!")
