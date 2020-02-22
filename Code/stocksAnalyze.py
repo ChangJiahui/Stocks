@@ -323,14 +323,14 @@ def get_stockdata():
 def EHBF_Analyze():
 # 横盘天数 & 振幅 & EMA & earnratio & PE & PB
     resultfile_path = os.path.join(resultdata_path, "EHBF_Analyze_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "历史位置(%)", "百日位置(%)", "总交易日", "主力控盘比例", "获利持仓比例", "压力筹码比例", "支撑筹码比例", "总市值", "流通市值", "10日标准差", "20日标准差", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均10日振幅", "平均20日振幅", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅"]
+    title = ["股票名称", "当日涨跌幅", "历史位置(%)", "百日位置(%)", "总交易日", "主力控盘比例", "获利持仓比例", "压力筹码比例", "支撑筹码比例", "总市值", "流通市值", "10日标准差分位", "20日标准差分位", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均10日振幅分位", "平均20日振幅分位", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         resultdata_list.append(EHBF_Analyze_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
 def EHBF_Analyze_par():
     resultfile_path = os.path.join(resultdata_path, "EHBF_Analyze_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "历史位置(%)", "百日位置(%)", "总交易日", "主力控盘比例", "获利持仓比例", "压力筹码比例", "支撑筹码比例", "总市值", "流通市值", "10日标准差", "20日标准差", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均10日振幅", "平均20日振幅", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅"]
+    title = ["股票名称", "当日涨跌幅", "历史位置(%)", "百日位置(%)", "总交易日", "主力控盘比例", "获利持仓比例", "压力筹码比例", "支撑筹码比例", "总市值", "流通市值", "10日标准差分位", "20日标准差分位", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均10日振幅分位", "平均20日振幅分位", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(EHBF_Analyze_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -430,22 +430,38 @@ def EHBF_Analyze_pipeline(filename):
         perioddaynum = min(1000, len(stockdata_list)-N2)
         if(perioddaynum<300):
             return 0.5, 0.5
-        closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum]]
+        closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N2]]
         std1_list = [0]*perioddaynum
         std2_list = [0]*perioddaynum
         for ii in range(perioddaynum):
-            std1 = np.std(closingprice_list[ii:ii+N1])/np.mean(closingprice_list[ii:ii+N1])*100
-            std2 = np.std(closingprice_list[ii:ii+N2])/np.mean(closingprice_list[ii:ii+N2])*100
-            std1_list[ii] = std1
-            std2_list[ii] = std2
-        std1dist = sum([num<std1_list[0] for num in std1_list])/perioddaynum
-        std2dist = sum([num<std2_list[0] for num in std2_list])/perioddaynum
+            std1_list[ii] = np.std(closingprice_list[ii:ii+N1])/np.mean(closingprice_list[ii:ii+N1])*100
+            std2_list[ii] = np.std(closingprice_list[ii:ii+N2])/np.mean(closingprice_list[ii:ii+N2])*100
+        std1sort_list = sorted(std1_list)
+        std2sort_list = sorted(std2_list)
+        std1dist = std1sort_list.index(std1_list[0])/perioddaynum
+        std2dist = std2sort_list.index(std2_list[0])/perioddaynum
         return std1dist, std2dist
 
     def amplitude_Analyze(stockdata_list):
-        amplitude10 = np.mean([((float(item[4])-float(item[5]))/float(item[7])*100) for item in stockdata_list[:10]])
-        amplitude20 = np.mean([((float(item[4])-float(item[5]))/float(item[7])*100) for item in stockdata_list[:20]])
-        return amplitude10, amplitude20
+        N1 = 10
+        N2 = 20
+        closingprice = float(stockdata_list[0][3])
+        perioddaynum = min(1000, len(stockdata_list)-N2)
+        if(perioddaynum<300):
+            return 0.5, 0.5
+        closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N2]]
+        upperprice_list = [float(item[4]) for item in stockdata_list[:perioddaynum+N2]]
+        lowerprice_list = [float(item[5]) for item in stockdata_list[:perioddaynum+N2]]
+        amp1_list = [0]*perioddaynum
+        amp2_list = [0]*perioddaynum
+        for ii in range(perioddaynum):
+            amp1_list[ii] = np.mean([(upperprice_list[jj]-lowerprice_list[jj])/closingprice_list[jj] for jj in range(ii, ii+N1)])
+            amp2_list[ii] = np.mean([(upperprice_list[jj]-lowerprice_list[jj])/closingprice_list[jj] for jj in range(ii, ii+N2)])
+        amp1sort_list = sorted(amp1_list)
+        amp2sort_list = sorted(amp2_list)
+        amp1dist = amp1sort_list.index(amp1_list[0])/perioddaynum
+        amp2dist = amp2sort_list.index(amp2_list[0])/perioddaynum
+        return amp1dist, amp2dist
 
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
@@ -491,7 +507,7 @@ def value_Model_Select():
                     stock_pettm = stock_df["pe_ttm"].values[0]
                     stock_ps = stock_df["ps"].values[0]
                     stock_psttm = stock_df["ps_ttm"].values[0]
-                if((0<(stock_pettm*stock_pb)<50) or (0<(stock_pe*stock_pb)<50)):
+                if((0<(stock_pettm*stock_pb)<50) and (0<(stock_pe*stock_pb)<50)):
                     resultdata_list[ii] = resultdata_list[ii] + [stock_pb, stock_pe, stock_pettm, stock_ps, stock_psttm]
                 else:
                     resultdata_list.pop(ii)
@@ -547,8 +563,11 @@ def drop_Model_Select_pipeline(filename):
             modelcounter += 1
         else:
             break
-    volumnratio1 = float(stockdata_list[0][10])/float(stockdata_list[1][10])
-    if((modelcounter>3) and (volumnratio1>1)):
+    volumnratio1 = 1
+    for ii in range(modelcounter):
+        if(float(stockdata_list[ii][10])/float(stockdata_list[ii+1][10])>volumnratio1):
+            volumnratio1 = float(stockdata_list[0][10])/float(stockdata_list[1][10])
+    if((modelcounter>3) and (volumnratio1>1.5)):
         modelrange = (closingprice/closingprice_list[modelcounter]-1)*100
         lowerprice = float(stockdata_list[0][5])
         maxprice = max(closingprice_list[:min(100, perioddaynum)])
@@ -810,7 +829,7 @@ def parting_Model_Select_pipeline(filename):
         failcounter = maxoffset_list[0]-minoffset_list[0]
         reboundrange = (closingprice/minprice_list[0]-1)*100
         reboundcounter = minoffset_list[0]
-        if((failrange<0) and reboundrange<abs(failrange)/3):
+        if(reboundrange<20):
             return [stockinfo, stockdata_list[0][9], reboundrange, reboundcounter, failrange, failcounter]
     return []
 
@@ -955,6 +974,136 @@ def obv_Model_Select_pipeline(filename):
         lastfailrange = (minprice_list[1]/maxprice_list[1]-1)*100
         if(reboundrange<20):
             return [stockinfo, stockdata_list[0][9], obvdist_list[0], reboundrange, reboundcounter, failrange, failcounter, lastreboundrange, lastreboundcounter, lastfailrange, lastfailcounter]
+    return []
+
+
+def std_Model_Select():
+# 10日标准差历史择时模型
+    resultfile_path = os.path.join(resultdata_path, "std_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "std历史分位", "最近大波动幅度", "最近大波动天数", "最近小波动幅度", "最近小波动天数", "上一大波动幅度", "上一大波动天数", "上一小波动幅度", "上一小波动天数"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(std_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def std_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "std_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "std历史分位", "最近大波动幅度", "最近大波动天数", "最近小波动幅度", "最近小波动天数", "上一大波动幅度", "上一大波动天数", "上一小波动幅度", "上一小波动天数"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(std_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def std_Model_Select_pipeline(filename):
+    N = 10
+    P1 = 0.2
+    P2 = 0.8
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    closingprice = float(stockdata_list[0][3])
+    perioddaynum = min(1000, len(stockdata_list)-N)
+    if(perioddaynum<300):
+        return []
+    closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N]]
+    std_list = [0]*perioddaynum
+    stddist_list = [0]*perioddaynum
+    for ii in range(perioddaynum):
+        std_list[ii] = np.std(closingprice_list[ii:ii+N])/np.mean(closingprice_list[ii:ii+N])*100
+    stdsort_list = sorted(std_list)
+    for ii in range(perioddaynum):
+        stddist_list[ii] = stdsort_list.index(std_list[ii])/perioddaynum
+    minprice_list = []
+    minoffset_list = []
+    maxprice_list = []
+    maxoffset_list = []
+    isDrop = True
+    for ii in reversed(range(1, perioddaynum)):
+        if(isDrop):
+            if(stddist_list[ii-1]>P2):
+                minprice_list.insert(0, closingprice_list[ii])
+                minoffset_list.insert(0, ii)
+                isDrop=False
+        else:
+            if(stddist_list[ii-1]<P1):
+                maxprice_list.insert(0, closingprice_list[ii])
+                maxoffset_list.insert(0, ii)
+                isDrop=True
+    if((len(minprice_list)>3) and (len(maxprice_list)>3) and (stddist_list[0]>P2)):
+        reboundcounter = minoffset_list[0]
+        reboundrange = (closingprice/minprice_list[0]-1)*100
+        failcounter = maxoffset_list[0]-minoffset_list[0]
+        failrange = (minprice_list[0]/maxprice_list[0]-1)*100
+        lastreboundcounter = minoffset_list[1]-maxoffset_list[0]
+        lastreboundrange = (maxprice_list[0]/minprice_list[1]-1)*100
+        lastfailcounter = maxoffset_list[1]-minoffset_list[1]
+        lastfailrange = (minprice_list[1]/maxprice_list[1]-1)*100
+        if(reboundrange<20):
+            return [stockinfo, stockdata_list[0][9], stddist_list[0], reboundrange, reboundcounter, failrange, failcounter, lastreboundrange, lastreboundcounter, lastfailrange, lastfailcounter]
+    return []
+
+
+def amp_Model_Select():
+# 10日振幅历史择时模型
+    resultfile_path = os.path.join(resultdata_path, "amp_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "amp历史分位", "最近大振幅幅度", "最近大振幅天数", "最近小振幅幅度", "最近小振幅天数", "上一大振幅幅度", "上一大振幅天数", "上一小振幅幅度", "上一小振幅天数"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(amp_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def amp_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "amp_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "amp历史分位", "最近大振幅幅度", "最近大振幅天数", "最近小振幅幅度", "最近小振幅天数", "上一大振幅幅度", "上一大振幅天数", "上一小振幅幅度", "上一小振幅天数"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(amp_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def amp_Model_Select_pipeline(filename):
+    N = 10
+    P1 = 0.2
+    P2 = 0.8
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    closingprice = float(stockdata_list[0][3])
+    perioddaynum = min(1000, len(stockdata_list)-N)
+    if(perioddaynum<300):
+        return []
+    closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N]]
+    upperprice_list = [float(item[4]) for item in stockdata_list[:perioddaynum+N]]
+    lowerprice_list = [float(item[5]) for item in stockdata_list[:perioddaynum+N]]
+    amp_list = [0]*perioddaynum
+    ampdist_list = [0]*perioddaynum
+    for ii in range(perioddaynum):
+        amp_list[ii] = np.mean([(upperprice_list[jj]-lowerprice_list[jj])/closingprice_list[jj] for jj in range(ii, ii+N)])
+    ampsort_list = sorted(amp_list)
+    for ii in range(perioddaynum):
+        ampdist_list[ii] = ampsort_list.index(amp_list[ii])/perioddaynum
+    minprice_list = []
+    minoffset_list = []
+    maxprice_list = []
+    maxoffset_list = []
+    isDrop = True
+    for ii in reversed(range(1, perioddaynum)):
+        if(isDrop):
+            if(ampdist_list[ii-1]>P2):
+                minprice_list.insert(0, closingprice_list[ii])
+                minoffset_list.insert(0, ii)
+                isDrop=False
+        else:
+            if(ampdist_list[ii-1]<P1):
+                maxprice_list.insert(0, closingprice_list[ii])
+                maxoffset_list.insert(0, ii)
+                isDrop=True
+    if((len(minprice_list)>3) and (len(maxprice_list)>3) and (ampdist_list[0]>P2)):
+        reboundcounter = minoffset_list[0]
+        reboundrange = (closingprice/minprice_list[0]-1)*100
+        failcounter = maxoffset_list[0]-minoffset_list[0]
+        failrange = (minprice_list[0]/maxprice_list[0]-1)*100
+        lastreboundcounter = minoffset_list[1]-maxoffset_list[0]
+        lastreboundrange = (maxprice_list[0]/minprice_list[1]-1)*100
+        lastfailcounter = maxoffset_list[1]-minoffset_list[1]
+        lastfailrange = (minprice_list[1]/maxprice_list[1]-1)*100
+        if(reboundrange<20):
+            return [stockinfo, stockdata_list[0][9], ampdist_list[0], reboundrange, reboundcounter, failrange, failcounter, lastreboundrange, lastreboundcounter, lastfailrange, lastfailcounter]
     return []
 
 
@@ -1107,7 +1256,7 @@ def wave_Model_Select_pipeline(filename):
                 maxfailcounter = tempfailcounter
             if(maxreboundcounter<tempreboundcounter):
                 maxreboundcounter = tempreboundcounter
-        if((failrange<lastfailrange*2/3) and (failcounter>lastfailcounter) and (reboundrange<abs(failrange)/3) and (3<reboundcounter)):
+        if((failrange<lastfailrange*2/3) and (failcounter>lastfailcounter*2/3) and (reboundrange<abs(failrange)/3) and (reboundcounter>3)):
             return [stockinfo, stockdata_list[0][9], downwavecounter, upwavecounter, reboundrange, reboundcounter, failrange, failcounter, amountratio, wavevallratio, wavepeakratio,
                     lastreboundrange, lastreboundcounter, lastfailrange, lastfailcounter, lastamountratio, lastwavevallratio, lastwavepeakratio,
                     sumreboundrange, sumreboundcounter, sumfailrange, sumfailcounter, sumamountratio, maxreboundrange, maxreboundcounter, maxfailrange, maxfailcounter]
@@ -1208,7 +1357,7 @@ def tangle_Model_Select_pipeline(filename):
         maxprice = max(closingprice_list[:100])
         minprice = min(closingprice_list[:100])
         reboundrange = (closingprice-minprice)/(maxprice-minprice)*100
-        if((divrange<0) and (reboundrange<50)):
+        if(reboundrange<50):
             return [stockinfo, stockdata_list[0][9], reboundrange, tanglerange, tanglecounter, divrange, divcounter]
     return []
 
@@ -1567,29 +1716,11 @@ def MACDDIFF_Model_Select_pipeline(filename, N1, N2, N3):
     closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+1]]
     MACD_result = []
     DIFF_result = []
-    EMA1_list = [0]*(perioddaynum+1)
-    EMA2_list = [0]*(perioddaynum+1)
-    DEA_list = [0]*(perioddaynum+1)
-    DIFF_list = [0]*perioddaynum
-    DEAratio_list = [0]*perioddaynum
-    MACD_list = [0]*perioddaynum
-    for ii in reversed(range(perioddaynum)):
-        EMA1 = (N1-1)/(N1+1)*EMA1_list[ii+1] + 2/(N1+1)*closingprice_list[ii]
-        EMA2= (N2-1)/(N2+1)*EMA2_list[ii+1] + 2/(N2+1)*closingprice_list[ii]
-        DIFF = EMA1 - EMA2
-        DEA = (N3-1)/(N3+1)*DEA_list[ii+1] + 2/(N3+1)*DIFF
-        DEAratio = DEA/closingprice_list[ii]
-        MACD = (DIFF-DEA)*2
-        EMA1_list[ii] = EMA1
-        EMA2_list[ii] = EMA2
-        DIFF_list[ii] = DIFF
-        DEA_list[ii] = DEA
-        DEAratio_list[ii] = DEAratio
-        MACD_list[ii] = MACD
+    EMA1_list, EMA2_list, DIFF_list, DEA_list, DEAratio_list, MACD_list = get_MACD_para(closingprice_list, N1, N2, N3)
     if((MACD_list[1]<0) and (MACD_list[0]>MACD_list[1]) and (DEA_list[1]<0)):
         modelcounter = 1
         for ii in range(1, perioddaynum):
-            if(MACD_list[ii]<0):
+            if((MACD_list[ii]<0) or (DIFF_list[ii])<0):
                 modelcounter+=1
             else:
                 break
@@ -1621,7 +1752,7 @@ def MACDDIFF_Model_Select_pipeline(filename, N1, N2, N3):
             tempmodelcounter = 0
             tempmodelrange = 0
             for jj in range(ii, perioddaynum):
-                if(MACD_list[jj]<0):
+                if((MACD_list[jj]<0) or (DIFF_list[jj]<0)):
                     tempmodelcounter += 1
                 else:
                     tempmodelrange = (closingprice_list[ii]/closingprice_list[ii+tempmodelcounter]-1)*100
@@ -1676,7 +1807,28 @@ def MACDDIFF_Model_Select_pipeline(filename, N1, N2, N3):
         if(modelrange<maxmodelrange*2/3):
             DIFF_result = [stockinfo, stockdata_list[0][9], modelpredict, modelcounter, modelrange, modelslope, DEA, DEAratio, round(crossrange,2), round(trendrange,2), round(parallelrange,2), maxmodelcounter, maxmodelrange, minDEA, minDEAdate, minDEAratio, minDEAratiodate]
     return MACD_result, DIFF_result
-
+def get_MACD_para(price_list, N1, N2, N3):
+    perioddaynum = len(price_list)-1
+    EMA1_list = [0]*(perioddaynum+1)
+    EMA2_list = [0]*(perioddaynum+1)
+    DEA_list = [0]*(perioddaynum+1)
+    DIFF_list = [0]*perioddaynum
+    DEAratio_list = [0]*perioddaynum
+    MACD_list = [0]*perioddaynum
+    for ii in reversed(range(perioddaynum)):
+        EMA1 = (N1-1)/(N1+1)*EMA1_list[ii+1] + 2/(N1+1)*price_list[ii]
+        EMA2= (N2-1)/(N2+1)*EMA2_list[ii+1] + 2/(N2+1)*price_list[ii]
+        DIFF = EMA1 - EMA2
+        DEA = (N3-1)/(N3+1)*DEA_list[ii+1] + 2/(N3+1)*DIFF
+        DEAratio = DEA/price_list[ii]
+        MACD = (DIFF-DEA)*2
+        EMA1_list[ii] = EMA1
+        EMA2_list[ii] = EMA2
+        DIFF_list[ii] = DIFF
+        DEA_list[ii] = DEA
+        DEAratio_list[ii] = DEAratio
+        MACD_list[ii] = MACD
+    return EMA1_list, EMA2_list, DIFF_list, DEA_list, DEAratio_list, MACD_list
 
 def EMV_Model_Select():
 # EMV 模型 (40,16) & 移动平均 EMVDIFF 模型
@@ -2119,52 +2271,56 @@ def lagging_Model_Select_pipeline(filename):
     comdata_list = []
     while(True):
         if(stockdata_list[offset1][0]>indexdata_list[offset2][0]):
-            comdata_list.append([stockdata_list[offset1][0], stockdata_list[offset1][3], stockdata_list[offset1][9], indexdata_list[offset2][3], 0])
+            comdata_list.append([stockdata_list[offset1][0], stockdata_list[offset1][3], stockdata_list[offset1][9], indexdata_list[offset2][3], 0, float(stockdata_list[offset1][3])/float(indexdata_list[offset2][3])])
             offset1+=1
         elif(stockdata_list[offset1][0]<indexdata_list[offset2][0]):
-            comdata_list.append([indexdata_list[offset2][0], stockdata_list[offset1][3], 0, indexdata_list[offset2][3], indexdata_list[offset2][9]])
+            comdata_list.append([indexdata_list[offset2][0], stockdata_list[offset1][3], 0, indexdata_list[offset2][3], indexdata_list[offset2][9], float(stockdata_list[offset1][3])/float(indexdata_list[offset2][3])])
             offset2+=1
         else:
-            comdata_list.append([stockdata_list[offset1][0], stockdata_list[offset1][3], stockdata_list[offset1][9], indexdata_list[offset2][3], indexdata_list[offset2][9]])
+            comdata_list.append([stockdata_list[offset1][0], stockdata_list[offset1][3], stockdata_list[offset1][9], indexdata_list[offset2][3], indexdata_list[offset2][9], float(stockdata_list[offset1][3])/float(indexdata_list[offset2][3])])
             offset1+=1
             offset2+=1
         if(offset1==min(510,len(stockdata_list))):
             break
         if(offset2==min(510,len(indexdata_list))):
             break
-    laggingcounter = 0
-    for ii in range(len(comdata_list)):
-        if(float(comdata_list[ii][2])<float(comdata_list[ii][4])):
-            laggingcounter += 1
-        else:
-            break
-    stockrange = (float(comdata_list[0][1])/float(comdata_list[laggingcounter][1])-1)*100
-    comrange = (float(comdata_list[0][3])/float(comdata_list[laggingcounter][3])-1)*100
-    laggingrange = comrange - stockrange
-    lagging30counter, lagging30range = lagging_calc(comdata_list, 30)
-    lagging60counter, lagging60range = lagging_calc(comdata_list, 60)
-    lagging100counter, lagging100range = lagging_calc(comdata_list, 100)
-    lagging200counter, lagging200range = lagging_calc(comdata_list, 200)
-    lagging500counter, lagging500range = lagging_calc(comdata_list, 500)
-    maxlaggingcounter = 0
-    maxlaggingrange = 0
-    for ii in range(laggingcounter, min(100, len(comdata_list)-1)):
-        templaggingcounter = 0
-        templaggingrange = 0
-        for jj in range(ii, min(100, len(comdata_list)-1)):
-            if(float(comdata_list[jj][2])<float(comdata_list[jj][4])):
-                templaggingcounter += 1
+    N1 = 12
+    N2 = 26
+    N3 = 9
+    EMA1_list, EMA2_list, DIFF_list, DEA_list, DEAratio_list, MACD_list = get_MACD_para([item[5] for item in comdata_list], N1, N2, N3)
+    if((MACD_list[1]<0) and (MACD_list[0]>MACD_list[1]) and (DEA_list[1]<0)):
+        laggingcounter = 0
+        for ii in range(len(MACD_list)):
+            if((MACD_list[ii]<0) or (DIFF_list[ii]<0)):
+                laggingcounter += 1
             else:
                 break
-            templaggingrange = (float(comdata_list[ii][3])/float(comdata_list[ii+templaggingcounter][3])-1)*100-(float(comdata_list[ii][1])/float(comdata_list[ii+templaggingcounter][1])-1)*100
-            if(maxlaggingrange<templaggingrange):
-                maxlaggingrange=templaggingrange
-            if(maxlaggingcounter<templaggingcounter):
-                maxlaggingcounter=templaggingcounter
-    if((laggingcounter>maxlaggingcounter/2) and (laggingrange>maxlaggingrange*2/3)):
-        return [stockinfo, comdata_list[0][2], stockrange, comrange, laggingrange, laggingcounter, maxlaggingrange, maxlaggingcounter, lagging30range, lagging30counter, lagging60range, lagging60counter, lagging100range, lagging100counter, lagging200range, lagging200counter, lagging500range, lagging500counter]
-    else:
-        return []
+        stockrange = (float(comdata_list[0][1])/float(comdata_list[laggingcounter][1])-1)*100
+        comrange = (float(comdata_list[0][3])/float(comdata_list[laggingcounter][3])-1)*100
+        laggingrange = comrange - stockrange
+        lagging30counter, lagging30range = lagging_calc(comdata_list, 30)
+        lagging60counter, lagging60range = lagging_calc(comdata_list, 60)
+        lagging100counter, lagging100range = lagging_calc(comdata_list, 100)
+        lagging200counter, lagging200range = lagging_calc(comdata_list, 200)
+        lagging500counter, lagging500range = lagging_calc(comdata_list, 500)
+        maxlaggingcounter = 0
+        maxlaggingrange = 0
+        for ii in range(laggingcounter, min(100, len(comdata_list)-1)):
+            templaggingcounter = 0
+            templaggingrange = 0
+            for jj in range(ii, min(200, len(comdata_list)-1)):
+                if((MACD_list[jj]<0) or (DIFF_list[jj]<0)):
+                    templaggingcounter += 1
+                else:
+                    break
+                templaggingrange = (float(comdata_list[ii][3])/float(comdata_list[ii+templaggingcounter][3])-1)*100-(float(comdata_list[ii][1])/float(comdata_list[ii+templaggingcounter][1])-1)*100
+                if(maxlaggingrange<templaggingrange):
+                    maxlaggingrange=templaggingrange
+                if(maxlaggingcounter<templaggingcounter):
+                    maxlaggingcounter=templaggingcounter
+        if((laggingcounter>maxlaggingcounter/2) and (laggingrange>maxlaggingrange*2/3)):
+            return [stockinfo, comdata_list[0][2], stockrange, comrange, laggingrange, laggingcounter, maxlaggingrange, maxlaggingcounter, lagging30range, lagging30counter, lagging60range, lagging60counter, lagging100range, lagging100counter, lagging200range, lagging200counter, lagging500range, lagging500counter]
+    return []
     
 
 def AHCom_Model_Select():
@@ -2213,50 +2369,55 @@ def AHCom_Model_Select():
                     comdata_list = []
                     while(True):
                         if(CNdata_list[offset1][0]>HKdata_list[offset2][0]):
-                            comdata_list.append([CNdata_list[offset1][0], CNdata_list[offset1][3], CNdata_list[offset1][9], HKdata_list[offset2][1], 0])
+                            comdata_list.append([CNdata_list[offset1][0], CNdata_list[offset1][3], CNdata_list[offset1][9], HKdata_list[offset2][1], 0, float(CNdata_list[offset1][3])/float(HKdata_list[offset2][1])])
                             offset1+=1
                         elif(CNdata_list[offset1][0]<HKdata_list[offset2][0]):
-                            comdata_list.append([HKdata_list[offset2][0], CNdata_list[offset1][3], 0, HKdata_list[offset2][1], HKdata_list[offset2][6]])
+                            comdata_list.append([HKdata_list[offset2][0], CNdata_list[offset1][3], 0, HKdata_list[offset2][1], HKdata_list[offset2][6], float(CNdata_list[offset1][3])/float(HKdata_list[offset2][1])])
                             offset2+=1
                         else:
-                            comdata_list.append([CNdata_list[offset1][0], CNdata_list[offset1][3], CNdata_list[offset1][9], HKdata_list[offset2][1], HKdata_list[offset2][6]])
+                            comdata_list.append([CNdata_list[offset1][0], CNdata_list[offset1][3], CNdata_list[offset1][9], HKdata_list[offset2][1], HKdata_list[offset2][6], float(CNdata_list[offset1][3])/float(HKdata_list[offset2][1])])
                             offset1+=1
                             offset2+=1
                         if(offset1==min(510,len(CNdata_list))):
                             break
                         if(offset2==min(510,len(HKdata_list))):
                             break
-                    laggingcounter = 0
-                    for jj in range(len(comdata_list)):
-                        if(float(comdata_list[jj][2])<float(comdata_list[jj][4])):
-                            laggingcounter += 1
-                        else:
-                            break
-                    stockrange = (float(comdata_list[0][1])-float(comdata_list[laggingcounter][1]))/float(comdata_list[laggingcounter][1])*100
-                    comrange = (float(comdata_list[0][3])-float(comdata_list[laggingcounter][3]))/float(comdata_list[laggingcounter][3])*100
-                    laggingrange = comrange - stockrange
-                    lagging30counter, lagging30range = lagging_calc(comdata_list, 30)
-                    lagging60counter, lagging60range = lagging_calc(comdata_list, 60)
-                    lagging100counter, lagging100range = lagging_calc(comdata_list, 100)
-                    lagging200counter, lagging200range = lagging_calc(comdata_list, 200)
-                    lagging500counter, lagging500range = lagging_calc(comdata_list, 500)
-                    maxlaggingcounter = 0
-                    maxlaggingrange = 0
-                    for ii in range(laggingcounter, min(100, len(comdata_list)-1)):
-                        templaggingcounter = 0
-                        templaggingrange = 0
-                        for jj in range(ii, len(comdata_list)-1):
-                            if(float(comdata_list[jj][2])<float(comdata_list[jj][4])):
-                                templaggingcounter += 1
+                    N1 = 12
+                    N2 = 26
+                    N3 = 9
+                    EMA1_list, EMA2_list, DIFF_list, DEA_list, DEAratio_list, MACD_list = get_MACD_para([item[5] for item in comdata_list], N1, N2, N3)
+                    if((MACD_list[1]<0) and (MACD_list[0]>MACD_list[1]) and (DEA_list[1]<0)):
+                        laggingcounter = 0
+                        for ii in range(len(MACD_list)):
+                            if((MACD_list[ii]<0) or (DIFF_list[ii]<0)):
+                                laggingcounter += 1
                             else:
                                 break
-                            templaggingrange = (float(comdata_list[ii][3])/float(comdata_list[ii+templaggingcounter][3])-1)*100-(float(comdata_list[ii][1])/float(comdata_list[ii+templaggingcounter][1])-1)*100
-                            if(maxlaggingrange<templaggingrange):
-                                maxlaggingrange=templaggingrange
-                            if(maxlaggingcounter<templaggingcounter):
-                                maxlaggingcounter=templaggingcounter
-                    if((laggingcounter>maxlaggingcounter/2) and (laggingrange>maxlaggingrange*2/3) and (A_Hratio<50)):
-                        resultdata_list.append([stockinfo, A_Hratio, stockrange, comrange, laggingrange, laggingcounter, maxlaggingrange, maxlaggingcounter, lagging30range, lagging30counter, lagging60range, lagging60counter, lagging100range, lagging100counter, lagging200range, lagging200counter, lagging500range, lagging500counter])
+                        stockrange = (float(comdata_list[0][1])-float(comdata_list[laggingcounter][1]))/float(comdata_list[laggingcounter][1])*100
+                        comrange = (float(comdata_list[0][3])-float(comdata_list[laggingcounter][3]))/float(comdata_list[laggingcounter][3])*100
+                        laggingrange = comrange - stockrange
+                        lagging30counter, lagging30range = lagging_calc(comdata_list, 30)
+                        lagging60counter, lagging60range = lagging_calc(comdata_list, 60)
+                        lagging100counter, lagging100range = lagging_calc(comdata_list, 100)
+                        lagging200counter, lagging200range = lagging_calc(comdata_list, 200)
+                        lagging500counter, lagging500range = lagging_calc(comdata_list, 500)
+                        maxlaggingcounter = 0
+                        maxlaggingrange = 0
+                        for ii in range(laggingcounter, min(200, len(comdata_list)-1)):
+                            templaggingcounter = 0
+                            templaggingrange = 0
+                            for jj in range(ii, len(comdata_list)-1):
+                                if((MACD_list[jj]<0) or (DIFF_list[jj]<0)):
+                                    templaggingcounter += 1
+                                else:
+                                    break
+                                templaggingrange = (float(comdata_list[ii][3])/float(comdata_list[ii+templaggingcounter][3])-1)*100-(float(comdata_list[ii][1])/float(comdata_list[ii+templaggingcounter][1])-1)*100
+                                if(maxlaggingrange<templaggingrange):
+                                    maxlaggingrange=templaggingrange
+                                if(maxlaggingcounter<templaggingcounter):
+                                    maxlaggingcounter=templaggingcounter
+                        if((laggingcounter>maxlaggingcounter/2) and (laggingrange>maxlaggingrange*2/3) and (A_Hratio<50)):
+                            resultdata_list.append([stockinfo, A_Hratio, stockrange, comrange, laggingrange, laggingcounter, maxlaggingrange, maxlaggingcounter, lagging30range, lagging30counter, lagging60range, lagging60counter, lagging100range, lagging100counter, lagging200range, lagging200counter, lagging500range, lagging500counter])
                     break
         write_csvfile(resultfile_path, title, resultdata_list)
 
@@ -2309,50 +2470,55 @@ def ABCom_Model_Select():
                     comdata_list = []
                     while(True):
                         if(CNdata_list[offset1][0]>Bdata_list[offset2][0]):
-                            comdata_list.append([CNdata_list[offset1][0], CNdata_list[offset1][3], CNdata_list[offset1][9], Bdata_list[offset2][3], 0])
+                            comdata_list.append([CNdata_list[offset1][0], CNdata_list[offset1][3], CNdata_list[offset1][9], Bdata_list[offset2][3], 0, float(CNdata_list[offset1][3])/float(Bdata_list[offset2][3])])
                             offset1+=1
                         elif(CNdata_list[offset1][0]<Bdata_list[offset2][0]):
-                            comdata_list.append([Bdata_list[offset2][0], CNdata_list[offset1][3], 0, Bdata_list[offset2][3], Bdata_list[offset2][9]])
+                            comdata_list.append([Bdata_list[offset2][0], CNdata_list[offset1][3], 0, Bdata_list[offset2][3], Bdata_list[offset2][9], float(CNdata_list[offset1][3])/float(Bdata_list[offset2][3])])
                             offset2+=1
                         else:
-                            comdata_list.append([CNdata_list[offset1][0], CNdata_list[offset1][3], CNdata_list[offset1][9], Bdata_list[offset2][3], Bdata_list[offset2][9]])
+                            comdata_list.append([CNdata_list[offset1][0], CNdata_list[offset1][3], CNdata_list[offset1][9], Bdata_list[offset2][3], Bdata_list[offset2][9], float(CNdata_list[offset1][3])/float(Bdata_list[offset2][3])])
                             offset1+=1
                             offset2+=1
                         if(offset1==min(510, len(CNdata_list))):
                             break
                         if(offset2==min(510, len(Bdata_list))):
                             break
-                    laggingcounter = 0
-                    for jj in range(len(comdata_list)):
-                        if(float(comdata_list[jj][2])<float(comdata_list[jj][4])):
-                            laggingcounter += 1
-                        else:
-                            break
-                    stockrange = (float(comdata_list[0][1])-float(comdata_list[laggingcounter][1]))/float(comdata_list[laggingcounter][1])*100
-                    comrange = (float(comdata_list[0][3])-float(comdata_list[laggingcounter][3]))/float(comdata_list[laggingcounter][3])*100
-                    laggingrange = comrange - stockrange 
-                    lagging30counter, lagging30range = lagging_calc(comdata_list, 30)
-                    lagging60counter, lagging60range = lagging_calc(comdata_list, 60)
-                    lagging100counter, lagging100range = lagging_calc(comdata_list, 100)
-                    lagging200counter, lagging200range = lagging_calc(comdata_list, 200)
-                    lagging500counter, lagging500range = lagging_calc(comdata_list, 500)
-                    maxlaggingcounter = 0
-                    maxlaggingrange = 0
-                    for ii in range(laggingcounter, min(100, len(comdata_list)-1)):
-                        templaggingcounter = 0
-                        templaggingrange = 0
-                        for jj in range(ii, len(comdata_list)-1):
-                            if(float(comdata_list[jj][2])<float(comdata_list[jj][4])):
-                                templaggingcounter += 1
+                    N1 = 12
+                    N2 = 26
+                    N3 = 9
+                    EMA1_list, EMA2_list, DIFF_list, DEA_list, DEAratio_list, MACD_list = get_MACD_para([item[5] for item in comdata_list], N1, N2, N3)
+                    if((MACD_list[1]<0) and (MACD_list[0]>MACD_list[1]) and (DEA_list[1]<0)):
+                        laggingcounter = 0
+                        for ii in range(len(MACD_list)):
+                            if((MACD_list[ii]<0) or (DIFF_list[ii]<0)):
+                                laggingcounter += 1
                             else:
                                 break
-                            templaggingrange = (float(comdata_list[ii][3])/float(comdata_list[ii+templaggingcounter][3])-1)*100-(float(comdata_list[ii][1])/float(comdata_list[ii+templaggingcounter][1])-1)*100
-                            if(maxlaggingrange<templaggingrange):
-                                maxlaggingrange=templaggingrange
-                            if(maxlaggingcounter<templaggingcounter):
-                                maxlaggingcounter=templaggingcounter
-                    if((laggingcounter>maxlaggingcounter/2) and (laggingrange>maxlaggingrange*2/3)):
-                        resultdata_list.append([stockinfo, A_Bratio, stockrange, comrange, laggingrange, laggingcounter, maxlaggingrange, maxlaggingcounter, lagging30range, lagging30counter, lagging60range, lagging60counter, lagging100range, lagging100counter, lagging200range, lagging200counter, lagging500range, lagging500counter])
+                        stockrange = (float(comdata_list[0][1])-float(comdata_list[laggingcounter][1]))/float(comdata_list[laggingcounter][1])*100
+                        comrange = (float(comdata_list[0][3])-float(comdata_list[laggingcounter][3]))/float(comdata_list[laggingcounter][3])*100
+                        laggingrange = comrange - stockrange 
+                        lagging30counter, lagging30range = lagging_calc(comdata_list, 30)
+                        lagging60counter, lagging60range = lagging_calc(comdata_list, 60)
+                        lagging100counter, lagging100range = lagging_calc(comdata_list, 100)
+                        lagging200counter, lagging200range = lagging_calc(comdata_list, 200)
+                        lagging500counter, lagging500range = lagging_calc(comdata_list, 500)
+                        maxlaggingcounter = 0
+                        maxlaggingrange = 0
+                        for ii in range(laggingcounter, min(100, len(comdata_list)-1)):
+                            templaggingcounter = 0
+                            templaggingrange = 0
+                            for jj in range(ii, len(comdata_list)-1):
+                                if((MACD_list[jj]<0) or (DIFF_list[jj]<0)):
+                                    templaggingcounter += 1
+                                else:
+                                    break
+                                templaggingrange = (float(comdata_list[ii][3])/float(comdata_list[ii+templaggingcounter][3])-1)*100-(float(comdata_list[ii][1])/float(comdata_list[ii+templaggingcounter][1])-1)*100
+                                if(maxlaggingrange<templaggingrange):
+                                    maxlaggingrange=templaggingrange
+                                if(maxlaggingcounter<templaggingcounter):
+                                    maxlaggingcounter=templaggingcounter
+                        if((laggingcounter>maxlaggingcounter/2) and (laggingrange>maxlaggingrange*2/3)):
+                            resultdata_list.append([stockinfo, A_Bratio, stockrange, comrange, laggingrange, laggingcounter, maxlaggingrange, maxlaggingcounter, lagging30range, lagging30counter, lagging60range, lagging60counter, lagging100range, lagging100counter, lagging200range, lagging200counter, lagging500range, lagging500counter])
                     break
         write_csvfile(resultfile_path, title, resultdata_list)
 
@@ -2909,29 +3075,11 @@ def MACDDIFFMonth_Model_Select_pipeline(filename):
         return [], []
     MACD_result = []
     DIFF_result = []
-    EMA1_list = [0]*(periodmonthnum+1)
-    EMA2_list = [0]*(periodmonthnum+1)
-    DEA_list = [0]*(periodmonthnum+1)
-    DIFF_list = [0]*periodmonthnum
-    DEAratio_list = [0]*periodmonthnum
-    MACD_list = [0]*periodmonthnum
-    for ii in reversed(range(periodmonthnum)):
-        EMA1 = (N1-1)/(N1+1)*EMA1_list[ii+1] + 2/(N1+1)*monthclosingprice_list[ii]
-        EMA2 = (N2-1)/(N2+1)*EMA2_list[ii+1] + 2/(N2+1)*monthclosingprice_list[ii]
-        DIFF = EMA1 - EMA2
-        DEA = (N3-1)/(N3+1)*DEA_list[ii+1] + 2/(N3+1)*DIFF
-        DEAratio = DEA/monthclosingprice_list[ii]
-        MACD = (DIFF-DEA)*2
-        EMA1_list[ii] = EMA1
-        EMA2_list[ii] = EMA2
-        DIFF_list[ii] = DIFF
-        DEA_list[ii] = DEA
-        DEAratio_list[ii] = DEAratio
-        MACD_list[ii] = MACD
+    EMA1_list, EMA2_list, DIFF_list, DEA_list, DEAratio_list, MACD_list = get_MACD_para(monthclosingprice_list, N1, N2, N3)
     if((MACD_list[1]<0) and (MACD_list[0]>MACD_list[1]) and (DEA_list[1]<0)):
         modelcounter = 1
         for ii in range(1, periodmonthnum):
-            if(MACD_list[ii]<0):
+            if((MACD_list[ii]<0) or (DIFF_list[ii]<0)):
                 modelcounter+=1
             else:
                 break
@@ -2963,7 +3111,7 @@ def MACDDIFFMonth_Model_Select_pipeline(filename):
             tempmodelcounter = 0
             tempmodelrange = 0
             for jj in range(ii, periodmonthnum):
-                if(MACD_list[jj]<0):
+                if((MACD_list[jj]<0) or (DIFF_list[jj]<0)):
                     tempmodelcounter += 1
                 else:
                     tempmodelrange = (monthclosingprice_list[ii]/monthclosingprice_list[ii+tempmodelcounter]-1)*100
@@ -3323,6 +3471,14 @@ def analyze_stockdata():
 #    obv_Model_Select()
     obv_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tobv_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tstd_Model_Select Begin!")
+#    std_Model_Select()
+    std_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tstd_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tamp_Model_Select Begin!")
+#    amp_Model_Select()
+    amp_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tamp_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tobvMACD_Model_Select Begin!")
 #    obvMACD_Model_Select()
     obvMACD_Model_Select_par()
