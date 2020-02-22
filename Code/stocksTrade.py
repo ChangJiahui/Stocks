@@ -14,6 +14,7 @@ end_time = time.strftime('%Y%m%d',time.localtime(time.time()-24*3600))
 
 root_path = "D:\\Workspace\\Python\\Stocks"
 stockdata_path = os.path.join(root_path, "Data", "stock_data")
+indexdata_path = os.path.join(root_path, "Data", "index_data")
 accountbook_path = os.path.join(root_path, "Trade.csv")
 tradefile_path = os.path.join(root_path, "Trade.log")
 
@@ -108,6 +109,21 @@ def trade_analyze():
             return ("")
 
 
+    def drop_Model_Trade_pipeline(stockdata_list):
+        closingprice = float(stockdata_list[0][3])
+        perioddaynum = len(stockdata_list)-1
+        closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+1]]
+        modelcounter = 0
+        for ii in range(perioddaynum):
+            if(float(stockdata_list[ii][9])<0):
+                modelcounter += 1
+            else:
+                break
+        if(modelcounter>=3):
+            return ("\t连续下跌买入信号 买入价格: " + str(round(closingprice,2)) + "\n")
+        return ("")
+
+
     def parting_Model_Trade_pipeline(stockdata_list):
         N = 2
         closingprice = float(stockdata_list[0][3])
@@ -130,9 +146,9 @@ def trade_analyze():
                 minoffset_list.append(ii)
         if((len(minoffset_list)>3) and (len(maxoffset_list)>3)):
             if(minoffset_list[0]==N):
-                return ("\t下分型买入信号 买入价格: " + str(round(minprice_list[0])) + "\n")
+                return ("\t下分型买入信号 买入价格: " + str(round(minprice_list[0],2)) + "\n")
             if(maxoffset_list[0]==N):
-                return ("\t上分型卖出信号 买入价格: " + str(round(maxprice_list[0])) + "\n")
+                return ("\t上分型卖出信号 买入价格: " + str(round(maxprice_list[0],2)) + "\n")
         return ("")
 
 
@@ -190,13 +206,13 @@ def trade_analyze():
         parallelprice = (DIFF_list[0]+sum(closingprice_list[:N2-1])/N2-sum(closingprice_list[:N1-1])/N1)/(1/N1-1/N2)
         parallelrange = (parallelprice/closingprice-1)*100
         if((DIFF_list[0]>0) and (DIFF_list[1]<0)):
-            return ("\t1日线上穿买入信号 买入价格: " + str(round(crossprice,2)) + "\n")
+            return ("\t1T5上穿买入信号 买入价格: " + str(round(crossprice,2)) + "\n")
         elif((DIFF_list[0]<0) and (DIFF_list[1]>0)):
-            return ("\t1日线下穿卖出信号 卖出价格: " + str(round(crossprice,2)) + "\n")
+            return ("\t1T5下穿卖出信号 卖出价格: " + str(round(crossprice,2)) + "\n")
         elif((DIFF_list[0]>DIFF_list[1]) and (DIFF_list[1]<DIFF_list[2])):
-            return ("\t1日线拐点买入信号 买入价格: " + str(round(parallelprice,2)) + "\n")
+            return ("\t1T5拐点买入信号 买入价格: " + str(round(parallelprice,2)) + "\n")
         elif((DIFF_list[0]<DIFF_list[1]) and (DIFF_list[1]>DIFF_list[2])):
-            return ("\t1日线拐点卖出信号 卖出价格: " + str(round(parallelprice,2)) + "\n")
+            return ("\t1T5拐点卖出信号 卖出价格: " + str(round(parallelprice,2)) + "\n")
         else:
             return ("")
         
@@ -458,6 +474,19 @@ def trade_analyze():
         return ("")
 
     resultstr = ""
+    index_list = ["上证指数_0000001", "深证成指_1399001"]
+    for ii in range(len(index_list)):
+        filename = os.path.join(os.path.join(indexdata_path, (index_list[ii]+".csv")))
+        _, indexdata_list = read_csvfile(filename)
+        resultstr = resultstr + index_list[ii] + "当前点位:" + str(indexdata_list[0][3]) + "\n"
+        resultstr = resultstr + wave_Model_Trade_pipeline(indexdata_list) \
+                              + drop_Model_Trade_pipeline(indexdata_list) \
+                              + parting_Model_Trade_pipeline(indexdata_list) \
+                              + RSRS_Model_Trade_pipeline(indexdata_list) \
+                              + MACD_Model_Trade_pipeline(indexdata_list) \
+                              + KDJ_Model_Trade_pipeline(indexdata_list) \
+                              + DMI_Model_Trade_pipeline(indexdata_list) \
+                              + trend1T5_Model_Select_pipeline(indexdata_list)
     title, trade_list = read_csvfile(accountbook_path)
 #    title = ["股票名称", "成本价格", "持仓数量", "最近交易价格", "最近交易数量", "低位价格", "高位价格", "跌3%价格", "涨3%价格", "当前价格", "持仓市值", "最近交易市值", "盈利比例"]
     for ii in range(len(trade_list)):
@@ -474,6 +503,7 @@ def trade_analyze():
             resultstr = resultstr + stockinfo + " 当前价格:" + str(stockdata_list[0][3]) + "\n"
             resultstr = resultstr + wave_Model_Trade_pipeline(stockdata_list) \
                                   + grid_Model_Trade_pipeline(float(trade_list[ii][3]), stockdata_list) \
+                                  + drop_Model_Trade_pipeline(stockdata_list) \
                                   + parting_Model_Trade_pipeline(stockdata_list) \
                                   + RSRS_Model_Trade_pipeline(stockdata_list) \
                                   + MACD_Model_Trade_pipeline(stockdata_list) \
