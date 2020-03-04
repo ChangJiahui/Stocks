@@ -778,7 +778,7 @@ def shadow_Model_Select_pipeline(filename):
                 maxshadowrange = tempshadowrange
                 maxshadowdate = stockdata_list[ii][0]
         if(reboundrange<50):
-            return [stockinfo, stockdata_list[0][9], round(openrange,2), round(cylinderrange,2), round(shadowrange,2), round(upperrange,2), round(reboundrange,2), volumnratio1, maxshadowrange, maxshadowdate, maxvolumnratio1, maxvolumndate1]
+            return [stockinfo, stockdata_list[0][9], openrange, cylinderrange, shadowrange, upperrange, reboundrange, volumnratio1, maxshadowrange, maxshadowdate, maxvolumnratio1, maxvolumndate1]
     return []
 
 
@@ -1182,6 +1182,8 @@ def wave_Model_Select_pipeline(filename):
             lastextremeprice=closingprice_list[ii]
             isDrop = True
             break
+        if(closingprice_list[ii]==max(closingprice_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])):
+            return []
     for ii in range(startoffset+1, perioddaynum):
         tempmaxprice = max(closingprice_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])
         tempminprice = min(closingprice_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])
@@ -1489,7 +1491,7 @@ def trend_Model_Select_pipeline(filename, N1, N2):
                         maxmodelrange = tempmodelrange
                     break
         if(modelrange<maxmodelrange*2/3):
-            return [stockinfo, stockdata_list[0][9], modelpredict, modelcounter, modelrange, DIFF_list[0], DIFFratio_list[0], round(crossrange,2), round(trendrange, 2), round(parallelrange,2), maxmodelcounter, maxmodelrange, minDIFF, minDIFFdate, minDIFFratio, minDIFFratiodate]
+            return [stockinfo, stockdata_list[0][9], modelpredict, modelcounter, modelrange, DIFF_list[0], DIFFratio_list[0], crossrange, trendrange, parallelrange, maxmodelcounter, maxmodelrange, minDIFF, minDIFFdate, minDIFFratio, minDIFFratiodate]
     return []
 
 
@@ -1575,7 +1577,74 @@ def KDJ_Model_Select_pipeline(filename):
                         maxmodelrange = tempmodelrange
                     break
         if(modelrange<maxmodelrange*2/3):
-            return [stockinfo, stockdata_list[0][9], modelpredict, modelcounter, modelrange, modelslope, round(Krange,2), K_list[0], D_list[0], J_list[0], RSV, maxmodelcounter, maxmodelrange, minJ, minJdate, maxJ, maxJdate]
+            return [stockinfo, stockdata_list[0][9], modelpredict, modelcounter, modelrange, modelslope, Krange, K_list[0], D_list[0], J_list[0], RSV, maxmodelcounter, maxmodelrange, minJ, minJdate, maxJ, maxJdate]
+    return []
+
+
+def BOLL_Model_Select():
+# BOLL 模型 N1=20 N2=2
+    resultfile_path = os.path.join(resultdata_path, "BOLL_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "百日位置", "BOLL极限宽", "BOLL下方天数", "BOLL下方涨跌幅", "上一BOLL下穿上轨天数", "下穿涨跌幅", "上一BOLL上穿下轨天数", "上穿涨跌幅", "BOLL开口", "BOLL趋势"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(BOLL_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def BOLL_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "BOLL_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "百日位置", "BOLL极限宽", "BOLL下方天数", "BOLL下方涨跌幅", "上一BOLL下穿上轨天数", "下穿涨跌幅", "上一BOLL上穿下轨天数", "上穿涨跌幅", "BOLL开口", "BOLL趋势"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(BOLL_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def BOLL_Model_Select_pipeline(filename):
+    N1 = 20
+    N2 = 2
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    closingprice = float(stockdata_list[0][3])
+    perioddaynum = min(200, len(stockdata_list)-N1)
+    if(perioddaynum<100):
+        return []
+    closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N1]]
+    MA_list = [0]*perioddaynum
+    STD_list = [0]*perioddaynum
+    WIDTH_list = [0]*perioddaynum
+    UP_list = [0]*perioddaynum
+    DN_list = [0]*perioddaynum
+    for ii in range(perioddaynum):
+        MA_list[ii] = np.mean(closingprice_list[ii:ii+N1])
+        STD_list[ii] = np.std(closingprice_list[ii:ii+N1])
+        UP_list[ii] = MA_list[ii]+STD_list[ii]*N2
+        DN_list[ii] = MA_list[ii]-STD_list[ii]*N2
+        WIDTH_list[ii] = (UP_list[ii]-DN_list[ii])/MA_list[ii]
+    if((closingprice_list[1]<DN_list[1]) or (closingprice_list[0]<DN_list[0])):
+        modelcounter = 1
+        for ii in range(1, perioddaynum):
+            if(closingprice_list[ii]<DN_list[ii]):
+                modelcounter += 1
+            else:
+                break
+        modelrange = (closingprice/closingprice_list[modelcounter]-1)*100
+        upoffset = 0
+        for ii in range(modelcounter, perioddaynum):
+            if((closingprice_list[ii]>UP_list[ii]) and (closingprice_list[ii-1]<UP_list[ii-1])):
+                upoffset = ii
+                break
+        uprange = (closingprice/closingprice_list[upoffset]-1)*100
+        dnoffset = 0
+        for ii in range(modelcounter, perioddaynum):
+            if((closingprice_list[ii]<DN_list[ii]) and (closingprice_list[ii-1]>DN_list[ii-1])):
+                dnoffset = ii
+                break
+        dnrange = (closingprice/closingprice_list[dnoffset]-1)*100
+        widthrange = (WIDTH_list[0]/WIDTH_list[10]-1)*100
+        marange = (MA_list[0]/MA_list[10]-1)*100
+        maxprice = max(closingprice_list[:100])
+        minprice = min(closingprice_list[:100])
+        reboundrange = (closingprice-minprice)/(maxprice-minprice)*100
+        if(reboundrange<50):
+            return [stockinfo, stockdata_list[0][9], reboundrange, WIDTH_list[0], modelcounter, modelrange, upoffset, uprange, dnoffset, dnrange, widthrange, marange]
     return []
 
 
@@ -1762,7 +1831,7 @@ def MACDDIFF_Model_Select_pipeline(filename, N1, N2, N3):
                         maxmodelrange = tempmodelrange
                     break
         if(modelrange<maxmodelrange*2/3):
-            MACD_result = [stockinfo, stockdata_list[0][9], modelpredict, modelcounter, modelrange, modelslope, DEA, DEAratio, round(crossrange,2), round(trendrange,2), round(parallelrange,2), maxmodelcounter, maxmodelrange, minDEA, minDEAdate, minDEAratio, minDEAratiodate]
+            MACD_result = [stockinfo, stockdata_list[0][9], modelpredict, modelcounter, modelrange, modelslope, DEA, DEAratio, crossrange, trendrange, parallelrange, maxmodelcounter, maxmodelrange, minDEA, minDEAdate, minDEAratio, minDEAratiodate]
     if((DIFF_list[1]<0) and (DIFF_list[0]>DIFF_list[1])):
         modelcounter = 1
         for ii in range(1, perioddaynum):
@@ -1805,7 +1874,7 @@ def MACDDIFF_Model_Select_pipeline(filename, N1, N2, N3):
                         maxmodelrange = tempmodelrange
                     break
         if(modelrange<maxmodelrange*2/3):
-            DIFF_result = [stockinfo, stockdata_list[0][9], modelpredict, modelcounter, modelrange, modelslope, DEA, DEAratio, round(crossrange,2), round(trendrange,2), round(parallelrange,2), maxmodelcounter, maxmodelrange, minDEA, minDEAdate, minDEAratio, minDEAratiodate]
+            DIFF_result = [stockinfo, stockdata_list[0][9], modelpredict, modelcounter, modelrange, modelslope, DEA, DEAratio, crossrange, trendrange, parallelrange, maxmodelcounter, maxmodelrange, minDEA, minDEAdate, minDEAratio, minDEAratiodate]
     return MACD_result, DIFF_result
 def get_MACD_para(price_list, N1, N2, N3):
     perioddaynum = len(price_list)-1
@@ -3032,7 +3101,73 @@ def KDJMonth_Model_Select_pipeline(filename):
                         maxmodelrange = tempmodelrange
                     break
         if(modelrange<maxmodelrange*2/3):
-            return [stockinfo, monthrange0, monthrange1, round(modelpredict,2), modelcounter, modelrange, modelslope, round(Krange,2), K_list[0], D_list[0], J_list[0], RSV,maxmodelcounter, maxmodelrange]
+            return [stockinfo, monthrange0, monthrange1, round(modelpredict,2), modelcounter, modelrange, modelslope, Krange, K_list[0], D_list[0], J_list[0], RSV,maxmodelcounter, maxmodelrange]
+    return []
+
+
+def BOLLMonth_Model_Select():
+# BOLL 模型 N1=20 N2=2
+    resultfile_path = os.path.join(resultdata_path, "BOLLMonth_Model_Select_Result.csv")
+    title = ["股票名称", "当月涨跌幅", "前月涨跌幅", "BOLL极限宽", "BOLL下方月数", "BOLL下方涨跌幅", "上一BOLL下穿上轨月数", "下穿涨跌幅", "上一BOLL上穿下轨月数", "上穿涨跌幅", "BOLL开口", "BOLL趋势"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(BOLLMonth_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def BOLLMonth_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "BOLLMonth_Model_Select_Result.csv")
+    title = ["股票名称", "当月涨跌幅", "前月涨跌幅", "BOLL极限宽", "BOLL下方月数", "BOLL下方涨跌幅", "上一BOLL下穿上轨月数", "下穿涨跌幅", "上一BOLL上穿下轨月数", "上穿涨跌幅", "BOLL开口", "BOLL趋势"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(BOLLMonth_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def BOLLMonth_Model_Select_pipeline(filename):
+    N1 = 20
+    N2 = 2
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    monthclosingprice_list, monthupperprice_list, monthlowerprice_list, _ = get_MonthData(stockdata_list)
+    monthclosingprice = monthclosingprice_list[0]
+    monthclosingprice_list = monthclosingprice_list[1:]
+    periodmonthnum = min(100, len(monthclosingprice_list)-N1)
+    if(periodmonthnum<10):
+        return []
+    MA_list = [0]*periodmonthnum
+    STD_list = [0]*periodmonthnum
+    WIDTH_list = [0]*periodmonthnum
+    UP_list = [0]*periodmonthnum
+    DN_list = [0]*periodmonthnum
+    for ii in range(periodmonthnum):
+        MA_list[ii] = np.mean(monthclosingprice_list[ii:ii+N1])
+        STD_list[ii] = np.std(monthclosingprice_list[ii:ii+N1])
+        UP_list[ii] = MA_list[ii]+STD_list[ii]*N2
+        DN_list[ii] = MA_list[ii]-STD_list[ii]*N2
+        WIDTH_list[ii] = (UP_list[ii]-DN_list[ii])/MA_list[ii]
+    if((monthclosingprice_list[1]<DN_list[1]) or (monthclosingprice_list[0]<DN_list[0]) or (monthclosingprice<DN_list[0])):
+        modelcounter = 1
+        for ii in range(1, periodmonthnum):
+            if(monthclosingprice_list[ii]<DN_list[ii]):
+                modelcounter += 1
+            else:
+                break
+        modelrange = (monthclosingprice_list[0]/monthclosingprice_list[modelcounter]-1)*100
+        upoffset = 0
+        for ii in range(modelcounter, periodmonthnum):
+            if((monthclosingprice_list[ii]>UP_list[ii]) and (monthclosingprice_list[ii-1]<UP_list[ii])):
+                upoffset = ii
+                break
+        uprange = (monthclosingprice_list[0]/monthclosingprice_list[upoffset]-1)*100
+        dnoffset = 0
+        for ii in range(modelcounter, periodmonthnum):
+            if((monthclosingprice_list[ii]<DN_list[ii]) and (monthclosingprice_list[ii-1]>DN_list[ii-1])):
+                dnoffset = ii
+                break
+        dnrange = (monthclosingprice_list[0]/monthclosingprice_list[dnoffset]-1)*100
+        widthrange = (WIDTH_list[0]/WIDTH_list[10]-1)*100
+        marange = (MA_list[0]/MA_list[10]-1)*100
+        monthrange0 = (monthclosingprice/monthclosingprice_list[0]-1)*100
+        monthrange1 = (monthclosingprice_list[0]/monthclosingprice_list[1]-1)*100
+        return [stockinfo, monthrange0, monthrange1, WIDTH_list[0], modelcounter, modelrange, upoffset, uprange, dnoffset, dnrange, widthrange, marange]
     return []
 
 
@@ -3121,7 +3256,7 @@ def MACDDIFFMonth_Model_Select_pipeline(filename):
                         maxmodelrange = tempmodelrange
                     break
         if(modelrange<maxmodelrange*2/3):
-            MACD_result = [stockinfo, monthrange0, monthrange1, round(modelpredict,2), modelcounter, modelrange, modelslope, DEA, DEAratio, round(crossrange,2), round(trendrange,2), round(parallelrange,2), maxmodelcounter, maxmodelrange, minDEA, minDEAratio]
+            MACD_result = [stockinfo, monthrange0, monthrange1, round(modelpredict,2), modelcounter, modelrange, modelslope, DEA, DEAratio, crossrange,2, trendrange, parallelrange, maxmodelcounter, maxmodelrange, minDEA, minDEAratio]
     if((DIFF_list[1]<0) and (DIFF_list[0]>DIFF_list[1])):
         modelcounter = 1
         for ii in range(1, periodmonthnum):
@@ -3164,7 +3299,7 @@ def MACDDIFFMonth_Model_Select_pipeline(filename):
                         maxmodelrange = tempmodelrange
                     break
         if(modelrange<maxmodelrange*2/3):
-            DIFF_result = [stockinfo, monthrange0, monthrange1, round(modelpredict,2), modelcounter, modelrange, modelslope, DEA, DEAratio, round(crossrange,2), round(trendrange,2), round(parallelrange,2), maxmodelcounter, maxmodelrange, minDEA, minDEAratio]
+            DIFF_result = [stockinfo, monthrange0, monthrange1, round(modelpredict,2), modelcounter, modelrange, modelslope, DEA, DEAratio, crossrange, trendrange, parallelrange, maxmodelcounter, maxmodelrange, minDEA, minDEAratio]
     return MACD_result, DIFF_result
 
 
@@ -3275,7 +3410,7 @@ def trendMonth_Model_Select_pipeline(filename, N1, N2):
                         maxmodelrange = tempmodelrange
                     break
         if(modelrange<maxmodelrange*2/3):
-            return [stockinfo, monthrange0, monthrange1, round(modelpredict,2), modelcounter, modelrange, DIFF_list[0], DIFFratio_list[0], round(crossrange,2), round(trendrange,2), round(parallelrange,2), maxmodelcounter, maxmodelrange, minDIFF, minDIFFratio]
+            return [stockinfo, monthrange0, monthrange1, round(modelpredict,2), modelcounter, modelrange, DIFF_list[0], DIFFratio_list[0], crossrange, trendrange, parallelrange, maxmodelcounter, maxmodelrange, minDIFF, minDIFFratio]
     return []
 
 
@@ -3451,6 +3586,10 @@ def analyze_stockdata():
 #    KDJ_Model_Select()
     KDJ_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tKDJ_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tBOLL_Model_Select Begin!")
+#    BOLL_Model_Select()
+    BOLL_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tBOLL_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tPVI_Model_Select Begin!")
 #    PVI_Model_Select()
     PVI_Model_Select_par()
@@ -3511,10 +3650,14 @@ def analyze_stockdata():
 #    MACDDIFFMonth_Model_Select()
     MACDDIFFMonth_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMACDDIFFMonth_Model_Select Finished!")
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tKDJMonth_Model_Select Begin!")    
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tKDJMonth_Model_Select Begin!")
 #    KDJMonth_Model_Select()
     KDJMonth_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tKDJMonth_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tBOLLMonth_Model_Select Begin!")
+#    BOLLMonth_Model_Select()
+    BOLLMonth_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tBOLLMonth_Model_Select Finished!")
 #    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tAHCom_Model_Select Begin!")
 #    AHCom_Model_Select()
 #    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tAHCom_Model_Select Finished!")
