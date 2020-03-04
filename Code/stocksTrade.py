@@ -124,6 +124,36 @@ def trade_analyze():
         return ("")
 
 
+    def BOLL_Model_Trade_pipeline(stockdata_list):
+        N1 = 20
+        N2 = 2
+        closingprice = float(stockdata_list[0][3])
+        perioddaynum = min(200, len(stockdata_list)-N1)
+        if(perioddaynum<10):
+            return ("")
+        closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N1]]
+        MA_list = [0]*perioddaynum
+        STD_list = [0]*perioddaynum
+        WIDTH_list = [0]*perioddaynum
+        UP_list = [0]*perioddaynum
+        DN_list = [0]*perioddaynum
+        for ii in range(perioddaynum):
+            MA_list[ii] = np.mean(closingprice_list[ii:ii+N1])
+            STD_list[ii] = np.std(closingprice_list[ii:ii+N1])
+            UP_list[ii] = MA_list[ii]+STD_list[ii]*N2
+            DN_list[ii] = MA_list[ii]-STD_list[ii]*N2
+            WIDTH_list[ii] = (UP_list[ii]-DN_list[ii])/MA_list[ii]
+        if((closingprice_list[1]<DN_list[1]) or (closingprice_list[0]<DN_list[0])):
+            return ("\t BOLL超跌买入信号 买入价格: " + str(round(DN_list[0],2)) + "\n")
+        elif((closingprice_list[1]>UP_list[1]) or (closingprice_list[0]>UP_list[0])):
+            return ("\t BOLL超涨卖出信号 卖出价格: " + str(round(UP_list[0],2)) + "\n")
+        elif((closingprice_list[1]<MA_list[1]) and (closingprice_list[0]>MA_list[0])):
+            return ("\t BOLL均线买入信号 买入价格: " + str(round(MA_list[0],2)) + "\n")
+        elif((closingprice_list[1]>MA_list[1]) and (closingprice_list[0]<MA_list[0])):
+            return ("\t BOLL均线卖出信号 卖出价格: " + str(round(MA_list[0],2)) + "\n")
+        return ("")
+
+
     def parting_Model_Trade_pipeline(stockdata_list):
         N = 2
         closingprice = float(stockdata_list[0][3])
@@ -481,6 +511,7 @@ def trade_analyze():
         resultstr = resultstr + index_list[ii] + "当前点位:" + str(indexdata_list[0][3]) + "\n"
         resultstr = resultstr + wave_Model_Trade_pipeline(indexdata_list) \
                               + drop_Model_Trade_pipeline(indexdata_list) \
+                              + BOLL_Model_Trade_pipeline(indexdata_list) \
                               + parting_Model_Trade_pipeline(indexdata_list) \
                               + RSRS_Model_Trade_pipeline(indexdata_list) \
                               + MACD_Model_Trade_pipeline(indexdata_list) \
@@ -504,6 +535,7 @@ def trade_analyze():
             resultstr = resultstr + wave_Model_Trade_pipeline(stockdata_list) \
                                   + grid_Model_Trade_pipeline(float(trade_list[ii][3]), stockdata_list) \
                                   + drop_Model_Trade_pipeline(stockdata_list) \
+                                  + BOLL_Model_Trade_pipeline(stockdata_list) \
                                   + parting_Model_Trade_pipeline(stockdata_list) \
                                   + RSRS_Model_Trade_pipeline(stockdata_list) \
                                   + MACD_Model_Trade_pipeline(stockdata_list) \
