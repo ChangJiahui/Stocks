@@ -162,19 +162,51 @@ def get_163data(stock163code, start_time, end_time, filename):
 
 
 def get_YahooHKdata(stockHcode, start_time, end_time, filename):
-    title = ["日期", "开盘价", "最高价", "最低价", "收盘价", '复权收盘价', "成交量", "日涨跌幅"]
-    yahoo_url = "https://query1.finance.yahoo.com/v7/finance/download/{}.HK?period1={}&period2={}&interval=1d&events=history".format(stockHcode[-4:],int(time.mktime(time.strptime(start_time,"%Y%m%d"))),int(time.mktime(time.strptime(end_time,"%Y%m%d")))+24*3600)
-    if(download_file(yahoo_url, filename)):
-        _, HKdata_list = read_csvfile(filename)
-        HKdata_list.reverse()
-        HKdata_list[-1].append(0)
-        for ii in reversed(range(len(HKdata_list)-1)):
-            if(HKdata_list[ii][1]=="null"):
-                HKdata_list.pop(ii)
+    title = ["日期", "收盘价", "最高价", "最低价", "开盘价", "成交量", "涨跌幅"]
+    yahoo_url = "https://finance.yahoo.com/quote/{}.HK/history?period1={}&period2={}&interval=1d&filter=history&frequency=1d".format(stockHcode[-4:],int(time.mktime(time.strptime(start_time,"%Y%m%d"))),int(time.mktime(time.strptime(end_time,"%Y%m%d")))+24*3600)
+    response = get_htmltext(yahoo_url)
+    if(response!=""):
+        soup = BeautifulSoup(response, "lxml")
+        script_json = json.loads(soup.find_all('script')[-3].text.split("\n")[5][16:-1])
+        prices_json = script_json['context']['dispatcher']['stores']['HistoricalPriceStore']['prices']
+        prices_df = pd.DataFrame(prices_json)
+        if(len(prices_df)>0):
+            prices_df.sort_values(['date', 'close'], ascending=[False,False],inplace = True)
+            prices_df['date'] = prices_df['date'].apply(lambda x: dt.date.fromtimestamp(x).strftime('%Y-%m-%d'))
+            prices_list = []
+            if(prices_df.shape[1]>7):
+                prices_df = prices_df[["date", "close", "high", "low", "open", "volume", "data", "type"]]
+                prices_list = prices_df.values.tolist()
+                prices_list[-1] = prices_list[-1][:6] + [0]
+                for ii in reversed(range(len(prices_list)-1)):
+                    if(prices_list[ii][-1]=="DIVIDEND"):
+                        proportion = (prices_list[ii+1][1]-prices_list[ii][-2])/prices_list[ii+1][1]
+                        prices_list.pop(ii)
+                        for jj in range(ii, len(prices_list)):
+                            prices_list[jj][1] = prices_list[jj][1]*proportion
+                            prices_list[jj][2] = prices_list[jj][2]*proportion
+                            prices_list[jj][3] = prices_list[jj][3]*proportion
+                            prices_list[jj][4] = prices_list[jj][4]*proportion
+                    elif(prices_list[ii][-1]=="SPLIT"):
+                        prices_list.pop(ii)
+                    elif(np.isnan(prices_list[ii][1:5]).all()):
+                        prices_list.pop(ii)
+#                    elif(not np.isnan(prices_list[ii][-1])):
+#                        print("ERROR Except SPLIT&DIVIDEND")
+#                        print(stockHcode)
+                    else:
+                        prices_list[ii] = prices_list[ii][:6] + [(prices_list[ii][1]/prices_list[ii+1][1]-1)*100]
             else:
-                HKdata_list[ii].append((float(HKdata_list[ii][5])/float(HKdata_list[ii+1][5])-1)*100)
-        write_csvfile(filename, title, HKdata_list)
-        return True
+                prices_df = prices_df[["date", "close", "high", "low", "open", "volume"]]
+                prices_list = prices_df.values.tolist()
+                prices_list[-1] = prices_list[-1][:6] + [0]
+                for ii in reversed(range(len(prices_list)-1)):
+                    if(np.isnan(prices_list[ii][1:5]).all()):
+                        prices_list.pop(ii)
+                    else:
+                        prices_list[ii] = prices_list[ii][:6] + [(prices_list[ii][1]/prices_list[ii+1][1]-1)*100]
+            write_csvfile(filename, title, prices_list)
+            return True
     return False
 
 
@@ -2398,7 +2430,6 @@ def AHCom_Model_Select():
             A_Hratio = (1/(1+float(AHComitem[9]))-1)*100
             for filename in os.listdir(stockdata_path):
                 if(str(AHComitem[2]).zfill(7)==filename.split(".")[0][-7:]):
-                    print(filename)
                     _, HKdata_list = read_csvfile(HKfilename)
                     _, CNdata_list = read_csvfile(os.path.join(stockdata_path, filename))
                     stockinfo = filename.split(".")[0]
@@ -2407,13 +2438,13 @@ def AHCom_Model_Select():
                     comdata_list = []
                     while(True):
                         if(CNdata_list[offset1][0]>HKdata_list[offset2][0]):
-                            comdata_list.append([CNdata_list[offset1][0], CNdata_list[offset1][3], CNdata_list[offset1][9], HKdata_list[offset2][5], 0, float(CNdata_list[offset1][3])/float(HKdata_list[offset2][5])])
+                            comdata_list.append([CNdata_list[offset1][0], CNdata_list[offset1][3], CNdata_list[offset1][9], HKdata_list[offset2][1], 0, float(CNdata_list[offset1][3])/float(HKdata_list[offset2][1])])
                             offset1+=1
                         elif(CNdata_list[offset1][0]<HKdata_list[offset2][0]):
-                            comdata_list.append([HKdata_list[offset2][0], CNdata_list[offset1][3], 0, HKdata_list[offset2][5], HKdata_list[offset2][7], float(CNdata_list[offset1][3])/float(HKdata_list[offset2][5])])
+                            comdata_list.append([HKdata_list[offset2][0], CNdata_list[offset1][3], 0, HKdata_list[offset2][1], HKdata_list[offset2][6], float(CNdata_list[offset1][3])/float(HKdata_list[offset2][1])])
                             offset2+=1
                         else:
-                            comdata_list.append([CNdata_list[offset1][0], CNdata_list[offset1][3], CNdata_list[offset1][9], HKdata_list[offset2][5], HKdata_list[offset2][7], float(CNdata_list[offset1][3])/float(HKdata_list[offset2][5])])
+                            comdata_list.append([CNdata_list[offset1][0], CNdata_list[offset1][3], CNdata_list[offset1][9], HKdata_list[offset2][1], HKdata_list[offset2][6], float(CNdata_list[offset1][3])/float(HKdata_list[offset2][1])])
                             offset1+=1
                             offset2+=1
                         if(offset1==min(510,len(CNdata_list))):
@@ -2638,8 +2669,6 @@ def margin_Model_Select():
                     closingprice = float(stockdata_list[0][3])
                     perioddaynum = min(400, len(margin_list))
                     rounddaynum = 10
-                    if(perioddaynum<50):
-                        break
                     rzjye_list = [(float(margin_list[ii][2])-float(margin_list[ii][3])) for ii in range(perioddaynum)]
                     rzjyerange = ((rzjye_list[0]/rzjye_list[1])-1)*100
                     minoffset = perioddaynum-1
@@ -2707,7 +2736,6 @@ def margin_Model_Select():
                         if((rzjyefailrange<lastrzjyefailrange) and (rzjyefailcounter>lastrzjyefailcounter) and (3<rzjyereboundcounter) and (pricefailrange<-10)  and (pricereboundrange<abs(pricefailrange)/3)):
                             resultdata_list.append([stockinfo, rzjyerange, rzjye_list[0], rzjyereboundrange, pricereboundrange, rzjyereboundcounter, rzjyefailrange, pricefailrange, rzjyefailcounter,
                                                     lastrzjyereboundrange, lastpricereboundrange, lastrzjyereboundcounter, lastrzjyefailrange, lastpricefailrange, lastrzjyefailcounter])
-                    break
         write_csvfile(resultfile_path, title, resultdata_list)
 
 
@@ -3102,7 +3130,7 @@ def BOLLMonth_Model_Select_pipeline(filename):
     monthclosingprice = monthclosingprice_list[0]
     monthclosingprice_list = monthclosingprice_list[1:]
     periodmonthnum = min(100, len(monthclosingprice_list)-N1)
-    if(periodmonthnum<20):
+    if(periodmonthnum<10):
         return []
     MA_list = [0]*periodmonthnum
     STD_list = [0]*periodmonthnum
@@ -3630,9 +3658,9 @@ def analyze_stockdata():
 #    BOLLMonth_Model_Select()
     BOLLMonth_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tBOLLMonth_Model_Select Finished!")
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tAHCom_Model_Select Begin!")
-    AHCom_Model_Select()
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tAHCom_Model_Select Finished!")
+#    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tAHCom_Model_Select Begin!")
+#    AHCom_Model_Select()
+#    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tAHCom_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tABCom_Model_Select Begin!")
     ABCom_Model_Select()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tABCom_Model_Select Finished!")
