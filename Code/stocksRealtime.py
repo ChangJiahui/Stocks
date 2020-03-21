@@ -19,7 +19,7 @@ Noon_End = "13:00:00"
 Closing_Time = "15:00:00"
 
 root_path = "D:\\Workspace\\Python\\Stocks"
-
+stocktrade_filepath = os.path.join(root_path, "trade.csv")
 
 def read_csvfile(filename):
     with open(filename, 'r') as fp:
@@ -37,22 +37,21 @@ def timesub(time1, time2):
     return (hour1-hour2)*3600+(minute1-minute2)*60+(second1-second2)
 
 
-def getAccountBook():
-    root_path = "D:\\Workspace\\Python\\Stocks"
-    stockholdings_filepath = os.path.join(root_path, "StockHoldings.csv")
-    title, stockholdings_list = read_csvfile(stockholdings_filepath)
+def getTradeBook():
+    title, trade_list = read_csvfile(stocktrade_filepath)
     stockinfo_list = []
-    stockcost_list = []
-    for stockholdings_item in stockholdings_list:
-        stockinfo = stockholdings_item[0]
-        stockcost = float(stockholdings_item[1])
-        stockinfo_list.append(stockinfo)
-        stockcost_list.append(stockcost)
-    return stockinfo_list, stockcost_list
+    pretrade_list = []
+    for ii in range(len(trade_list)):
+        stockinfo = trade_list[ii][0]
+        pretrade = float(trade_list[ii][3])
+        if(stockinfo[-6] in ['0', '6']):
+            stockinfo_list.append(stockinfo)
+            pretrade_list.append(pretrade)
+    return stockinfo_list, pretrade_list
 
 
 def price_Monitor(stockinfo_list, buyprice_list, sellprice_list):
-# 价格监控 到达买入卖出线后用MACD模型提示
+# 价格监控
     stockcode_list = [item[-6:] for item in stockinfo_list]
     stocknum = len(stockcode_list)
     price_list = [0 for ii in range(stocknum)]
@@ -88,27 +87,74 @@ def price_Monitor(stockinfo_list, buyprice_list, sellprice_list):
                 print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + '\t卖出: ' + stockinfo_list[ii] + "; 价格: " + str(price_list[ii]))
 
 
-def grid_Monitor(stockinfo_list, stockcost_list):
-# 网格交易法
+def grid_Monitor(stockinfo_list, baseprice_list):
+# 网格交易法 + MACD 确定买入点
     stockcode_list = [item[-6:] for item in stockinfo_list]
+    stocknum = len(stockcode_list)
     gridincrease = 0.03
-    griddrop = 0.05
+    griddrop = 0.03
+    price_list = [0 for ii in range(stocknum)]
+    EMA12_list = [0 for ii in range(stocknum)]
+    EMA26_list = [0 for ii in range(stocknum)]
+    DEA9_list = [0 for ii in range(stocknum)]
+    DIFF_list = [0 for ii in range(stocknum)]
+    MACD_list = [0 for ii in range(stocknum)]
+    price_list = [0 for ii in range(stocknum)]
+    MACDpre_list = [0 for ii in range(stocknum)]
     time_delay = 0
     while(True):
         time.sleep(time_delay)
         df = ts.get_realtime_quotes(stockcode_list)
         df_time = df['time']
         if(min(df_time)>=Opening_Time):
+            for ii in range(stocknum):
+                price_list[ii] = float(df[df.code==stockcode_list[ii]]['pre_close'].values[0])
+                EMA12_list[ii] = price_list[ii]
+                EMA26_list[ii] = price_list[ii]
             time_delay = 0
             break
         else:
             time_delay = timesub(Opening_Time, min(df_time))
-    price_Monitor(stockinfo_list, [(1-griddrop)*item for item in preclose_list], [(1+gridincrease)*item for item in preclose_list])
+
+    buyprice_list = [(1-griddrop)*item for item in baseprice_list]
+    sellprice_list = [(1+gridincrease)*item for item in baseprice_list]
+    while(True):
+        time.sleep(time_delay)
+        df = ts.get_realtime_quotes(stockcode_list)
+        df_time = df['time']
+        if((max(df_time) >= Noon_Begin) and (min(df_time) < Noon_End)):
+            time_delay = timesub(Noon_End, min(df_time))
+            continue
+        if(max(df_time) >= Closing_Time):
+            break
+        time_delay = 60 - (float(max(df_time)[-2:])%60)
+        for ii in range(stocknum):
+            price_list[ii] = float(df[df.code==stockcode_list[ii]]['price'].values[0])
+            price_list[ii] = float(df[df.code==stockcode_list[ii]]['price'].values[0])
+            EMA12_list[ii] = 11/13*EMA12_list[ii] + 2/13*price_list[ii]
+            EMA26_list[ii] = 25/27*EMA26_list[ii] + 2/27*price_list[ii]
+            DIFF_list[ii] = EMA12_list[ii] - EMA26_list[ii]
+            DEA9_list[ii] = 8/10*DEA9_list[ii] + 2/10*DIFF_list[ii]
+            MACDpre_list[ii] = MACD_list[ii]
+            MACD_list[ii] = DIFF_list[ii]-DEA9_list[ii]
+            MACD_predict = math.ceil(MACD_list[ii]/(MACDpre_list[ii]-MACD_list[ii]))
+#            if((price_list[ii]<=buyprice_list[ii]) and ((MACDpre_list[ii]>0) and (MACD_list[ii]<MACDpre_list[ii]) and MACD_predict<3)):
+            if(price_list[ii]<=buyprice_list[ii]):
+                buyprice_list[ii] = price_list[ii]*(1-griddrop)
+                sellprice_list[ii] = price_list[ii]*(1+gridincrease)
+                print("\a")
+                print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + '\t买入: ' + stockinfo_list[ii] + "; 价格: " + str(price_list[ii]))
+#            if(price_list[ii]>=sellprice_list[ii] and ((MACDpre_list[ii]<0) and (MACD_list[ii]>MACDpre_list[ii]) and MACD_predict<3)):
+            if(price_list[ii]>=sellprice_list[ii]):
+                buyprice_list[ii] = price_list[ii]*(1-griddrop)
+                sellprice_list[ii] = price_list[ii]*(1+gridincrease)
+                print("\a") 
+                print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + '\t卖出: ' + stockinfo_list[ii] + "; 价格: " + str(price_list[ii]))
 
 
-def accountBook_grid():
-    stockinfo_list, stockcost_list = getAccountBook()
-    grid_Monitor([item[-6:] for item in stockinfo_list], stockcost_list)
+def tradegrid_Moniter():
+    stockinfo_list, pretrade_list = getTradeBook()
+    grid_Monitor(stockinfo_list, pretrade_list)
 
 
 def tshape_Monitor(stockinfo_list):
@@ -149,7 +195,6 @@ def MACD_Monitor(stockinfo_list):
     price_list = [0 for ii in range(stocknum)]
     MACDpre_list = [0 for ii in range(stocknum)]
     time_delay = 0
-
     while(True):
         time.sleep(time_delay)
         df = ts.get_realtime_quotes(stockcode_list)
@@ -190,7 +235,8 @@ def MACD_Monitor(stockinfo_list):
 #            print(stockinfo_list[ii] + "\tMACD: " + str(MACD_list[ii]))
 #            print(stockinfo_list[ii] + "\tprice: " + str(price_list[ii]))
 #            print(stockinfo_list[ii] + "\tDEA/price: " + str(DEA9_list[ii]/price_list[ii]))
-            if((MACDpre_list[ii]>0) and (MACD_list[ii]<MACDpre_list[ii]) and (DEA9_list[ii]>0) and (abs(DEA9_list[ii])>DEA_Limit*price_list[ii])):
+#            if((MACDpre_list[ii]>0) and (MACD_list[ii]<MACDpre_list[ii]) and (DEA9_list[ii]>0) and (abs(DEA9_list[ii])>DEA_Limit*price_list[ii])):
+            if((MACDpre_list[ii]>0) and (MACD_list[ii]<MACDpre_list[ii])):
                 MACD_predict = math.ceil(MACD_list[ii]/(MACDpre_list[ii]-MACD_list[ii]))
                 if(MACD_predict<3):
                     print("\a") 
@@ -201,7 +247,8 @@ def MACD_Monitor(stockinfo_list):
                     parallel_price = (5/8*MACD_list[ii]+DEA9_list[ii]-11/13*EMA12_list[ii]+25/27*EMA26_list[ii])/(2/13-2/27)
                     print("相交价格: " + str(round(cross_price,2)) + " ; 平行价格: " + str(round(parallel_price, 2)))
                     print(DEA9_list[ii])
-            if((MACDpre_list[ii]<0) and (MACD_list[ii]>MACDpre_list[ii]) and (DEA9_list[ii]<0) and (abs(DEA9_list[ii])>DEA_Limit*price_list[ii])):
+#            if((MACDpre_list[ii]<0) and (MACD_list[ii]>MACDpre_list[ii]) and (DEA9_list[ii]<0) and (abs(DEA9_list[ii])>DEA_Limit*price_list[ii])):
+            if((MACDpre_list[ii]<0) and (MACD_list[ii]>MACDpre_list[ii])):
                 MACD_predict = math.ceil(MACD_list[ii]/(MACDpre_list[ii]-MACD_list[ii]))
                 if(MACD_predict<3):
                     print("\a")
@@ -212,6 +259,11 @@ def MACD_Monitor(stockinfo_list):
                     parallel_price = (5/8*MACD_list[ii]+DEA9_list[ii]-11/13*EMA12_list[ii]+25/27*EMA26_list[ii])/(2/13-2/27)
                     print("相交价格: " + str(round(cross_price,2)) + " ; 平行价格: " + str(round(parallel_price,2)))
                     print(DEA9_list[ii])
+
+
+def tradeMACD_Moniter():
+    stockinfo_list, _ = getTradeBook()
+    MACD_Monitor(stockinfo_list)
 
 
 def rebound_Monitor():
@@ -233,14 +285,55 @@ def rebound_Monitor():
         time.sleep(time_delay)
 
 
+def wheel_Moniter():
+#    stockinfo_list = ['HS300-中国石油_0601857', 'HS300-中国石化_0600028']
+    stockinfo_list = ['HS300-中国银行_0601988', 'HS300-工商银行_0601398', 'HS300-建设银行_0601939', 'HS300-农业银行_0601288', 'HS300-交通银行_0601328', 'HS300-招商银行_0600036']
+    stockcode_list = [item[-6:] for item in stockinfo_list]
+    interval = 0.005
+    stocknum = len(stockinfo_list)
+    preclose_list = [0 for ii in range(stocknum)]
+    price_list = [0 for ii in range(stocknum)]
+    ratio_list = [0 for ii in range(stocknum)]
+    time_delay = 0
+    while(True):
+        time.sleep(time_delay)
+        df = ts.get_realtime_quotes(stockcode_list)
+        df_time = df['time']
+        if(min(df_time)>=Opening_Time):
+            for ii in range(stocknum):
+                preclose_list[ii] = float(df[df.code==stockcode_list[ii]]['pre_close'].values[0])
+            time_delay = 0
+            break
+        else:
+            time_delay = timesub(Opening_Time, min(df_time))
+    while(True):
+        time.sleep(time_delay)
+        df = ts.get_realtime_quotes(stockcode_list)
+        df_time = df['time']
+        if((max(df_time) >= Noon_Begin) and (min(df_time) < Noon_End)):
+            time_delay = timesub(Noon_End, min(df_time))
+            continue
+        if(max(df_time) >= Closing_Time):
+            break
+        time_delay = 60 - (float(max(df_time)[-2:])%60)
+        for ii in range(stocknum):
+            price_list[ii] = float(df[df.code==stockcode_list[ii]]['price'].values[0])
+            ratio_list[ii] = price_list[ii]/preclose_list[ii]
+        if((max(ratio_list)-min(ratio_list))>interval):
+            print("\a")
+            print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + '\t卖出：' + stockinfo_list[ratio_list.index(max(ratio_list))] + '； 价格： ' + str(price_list[ratio_list.index(max(ratio_list))]) +  '买入: ' + stockinfo_list[ratio_list.index(min(ratio_list))] + "; 价格: " + str(price_list[ratio_list.index(min(ratio_list))]))
+
+
 if(__name__ == "__main__"):
 #    MACD_Monitor(["1巨人网络_1002558", "3森源电气_1002358", "4浙江交科_1002061", "5百隆东方_0601339", "6大晟文化_0600892", "7深圳惠程_1002168", "8华友钴业_0603799", "9金龙汽车600686", "10视觉中国000681", "11海容冷链603187", "12沃格光电603773", "13惠而浦600983"])
-    price_Monitor_list = []
-    price_Monitor_list.append(["视觉中国000681", 16.72, 18.13])
+#    price_Monitor_list = []
+#    price_Monitor_list.append(["视觉中国000681", 16.72, 18.13])
 #    price_Monitor_list.append(["三友化工600409", 5.56, 6.03])
-    price_Monitor_list.append(["浙江交科002061", 5.80, 6.30])
+#    price_Monitor_list.append(["浙江交科002061", 5.80, 6.30])
 #    price_Monitor_list.append(["九州通600998", 12.41, 13.45])
-    price_Monitor_list.append(["秋林股份600891", 1.45, 1.55])
-    price_Monitor_list.append(["大晟文化600892", 5.69, 6.00])
-    price_Monitor([item[0] for item in price_Monitor_list], [item[1] for item in price_Monitor_list], [item[2] for item in price_Monitor_list])
+#    price_Monitor_list.append(["秋林股份600891", 1.45, 1.55])
+#    price_Monitor_list.append(["大晟文化600892", 5.69, 6.00])
+#    price_Monitor([item[0] for item in price_Monitor_list], [item[1] for item in price_Monitor_list], [item[2] for item in price_Monitor_list])
 #    rebound_Monitor()
+    tradegrid_Moniter()
+#    tradeMACD_Moniter()
