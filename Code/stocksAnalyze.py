@@ -880,23 +880,92 @@ def RSRS_Model_Select_pipeline(filename):
     return []
 
 
-def obv_Model_Select():
-# 成交量放大历史择时模型
-    resultfile_path = os.path.join(resultdata_path, "obv_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "obv历史分位", "最近放量幅度", "最近放量天数", "最近缩量幅度", "最近缩量天数", "上一放量幅度", "上一放量天数", "上一缩量幅度", "上一缩量天数"]
+def OBV_Model_Select():
+# 累计成交量模型
+    resultfile_path = os.path.join(resultdata_path, "OBV_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "预测交叉天数", "OBV下方天数", "上穿前总跌幅", "累计OBV", "30日MAOBV", "百日最大下方天数", "百日最大上穿前跌幅"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
-        resultdata_list.append(obv_Model_Select_pipeline(filename))
+        resultdata_list.append(OBV_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
-def obv_Model_Select_par():
-    resultfile_path = os.path.join(resultdata_path, "obv_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "obv历史分位", "最近放量幅度", "最近放量天数", "最近缩量幅度", "最近缩量天数", "上一放量幅度", "上一放量天数", "上一缩量幅度", "上一缩量天数"]
+def OBV_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "OBV_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "预测交叉天数", "OBV下方天数", "上穿前总跌幅", "累计OBV", "30日MAOBV", "百日最大下方天数", "百日最大上穿前跌幅"]
     pool = multiprocessing.Pool(4)
-    resultdata_list = pool.map(obv_Model_Select_pipeline, os.listdir(stockdata_path))
+    resultdata_list = pool.map(OBV_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
     pool.join()
     write_csvfile(resultfile_path, title, resultdata_list)
-def obv_Model_Select_pipeline(filename):
+def OBV_Model_Select_pipeline(filename):
+    N = 30
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    closingprice = float(stockdata_list[0][3])
+    perioddaynum = len(stockdata_list)-N
+    if(perioddaynum<100):
+        return []
+    closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N]]
+    chg_list = [float(item[9]) for item in stockdata_list[:perioddaynum+N]]
+    obv_list = [float(item[10]) for item in stockdata_list[:perioddaynum+N]]
+    obvsum_list = [0]*(perioddaynum+N+1)
+    MA_list = [0]*perioddaynum
+    DIFF_list = [0]*perioddaynum
+    for ii in reversed(range(perioddaynum+N)):
+        if(chg_list[ii]>0):
+            obvsum_list[ii] = obvsum_list[ii+1] + obv_list[ii]
+        elif(chg_list[ii]<0):
+            obvsum_list[ii] = obvsum_list[ii+1] - obv_list[ii]
+        else:
+            obvsum_list[ii] = obvsum_list[ii+1]
+    for ii in range(perioddaynum):
+        MA_list[ii] = np.mean(obvsum_list[ii:ii+N])
+        DIFF_list[ii] = obvsum_list[ii] - MA_list[ii]
+    if((DIFF_list[1]<0) and (DIFF_list[0]>DIFF_list[1])):
+        modelcounter = 1
+        for ii in range(1, perioddaynum):
+            if(DIFF_list[ii]<0):
+                modelcounter+=1
+            else:
+                break
+        modelrange = (closingprice/closingprice_list[modelcounter]-1)*100
+        modelpredict = math.ceil(DIFF_list[0]/(DIFF_list[1]-DIFF_list[0]))
+        maxmodelcounter = 0
+        maxmodelrange = 0
+        for ii in range(modelcounter, min(200, perioddaynum)):
+            tempmodelcounter = 0
+            tempmodelrange = 0
+            for jj in range(ii, perioddaynum):
+                if(DIFF_list[jj]<0):
+                    tempmodelcounter += 1
+                else:
+                    tempmodelrange = (closingprice_list[ii]/closingprice_list[ii+tempmodelcounter]-1)*100
+                    if(maxmodelcounter<tempmodelcounter):
+                        maxmodelcounter = tempmodelcounter
+                    if(maxmodelrange>tempmodelrange):
+                        maxmodelrange = tempmodelrange
+                    break
+        if(modelrange<maxmodelrange*2/3):
+            return [stockinfo, stockdata_list[0][9], modelpredict, modelcounter, modelrange, obvsum_list[0], MA_list[0], maxmodelcounter, maxmodelrange]
+    return []
+
+
+def obvper_Model_Select():
+# 成交量放大历史择时模型
+    resultfile_path = os.path.join(resultdata_path, "obvper_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "obv历史分位", "最近放量幅度", "最近放量天数", "最近缩量幅度", "最近缩量天数", "上一放量幅度", "上一放量天数", "上一缩量幅度", "上一缩量天数"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(obvper_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def obvper_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "obvper_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "obv历史分位", "最近放量幅度", "最近放量天数", "最近缩量幅度", "最近缩量天数", "上一放量幅度", "上一放量天数", "上一缩量幅度", "上一缩量天数"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(obvper_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def obvper_Model_Select_pipeline(filename):
     N = 10
     P1 = 0.2
     P2 = 0.8
@@ -945,23 +1014,23 @@ def obv_Model_Select_pipeline(filename):
     return []
 
 
-def std_Model_Select():
+def stdper_Model_Select():
 # 10日标准差历史择时模型
-    resultfile_path = os.path.join(resultdata_path, "std_Model_Select_Result.csv")
+    resultfile_path = os.path.join(resultdata_path, "stdper_Model_Select_Result.csv")
     title = ["股票名称", "当日涨跌幅", "std历史分位", "最近大波动幅度", "最近大波动天数", "最近小波动幅度", "最近小波动天数", "上一大波动幅度", "上一大波动天数", "上一小波动幅度", "上一小波动天数"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
-        resultdata_list.append(std_Model_Select_pipeline(filename))
+        resultdata_list.append(stdper_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
-def std_Model_Select_par():
-    resultfile_path = os.path.join(resultdata_path, "std_Model_Select_Result.csv")
+def stdper_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "stdper_Model_Select_Result.csv")
     title = ["股票名称", "当日涨跌幅", "std历史分位", "最近大波动幅度", "最近大波动天数", "最近小波动幅度", "最近小波动天数", "上一大波动幅度", "上一大波动天数", "上一小波动幅度", "上一小波动天数"]
     pool = multiprocessing.Pool(4)
-    resultdata_list = pool.map(std_Model_Select_pipeline, os.listdir(stockdata_path))
+    resultdata_list = pool.map(stdper_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
     pool.join()
     write_csvfile(resultfile_path, title, resultdata_list)
-def std_Model_Select_pipeline(filename):
+def stdper_Model_Select_pipeline(filename):
     N = 10
     P1 = 0.2
     P2 = 0.8
@@ -1009,23 +1078,23 @@ def std_Model_Select_pipeline(filename):
     return []
 
 
-def amp_Model_Select():
+def ampper_Model_Select():
 # 10日振幅历史择时模型
-    resultfile_path = os.path.join(resultdata_path, "amp_Model_Select_Result.csv")
+    resultfile_path = os.path.join(resultdata_path, "ampper_Model_Select_Result.csv")
     title = ["股票名称", "当日涨跌幅", "amp历史分位", "最近大振幅幅度", "最近大振幅天数", "最近小振幅幅度", "最近小振幅天数", "上一大振幅幅度", "上一大振幅天数", "上一小振幅幅度", "上一小振幅天数"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
-        resultdata_list.append(amp_Model_Select_pipeline(filename))
+        resultdata_list.append(ampper_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
-def amp_Model_Select_par():
-    resultfile_path = os.path.join(resultdata_path, "amp_Model_Select_Result.csv")
+def ampper_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "ampper_Model_Select_Result.csv")
     title = ["股票名称", "当日涨跌幅", "amp历史分位", "最近大振幅幅度", "最近大振幅天数", "最近小振幅幅度", "最近小振幅天数", "上一大振幅幅度", "上一大振幅天数", "上一小振幅幅度", "上一小振幅天数"]
     pool = multiprocessing.Pool(4)
-    resultdata_list = pool.map(amp_Model_Select_pipeline, os.listdir(stockdata_path))
+    resultdata_list = pool.map(ampper_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
     pool.join()
     write_csvfile(resultfile_path, title, resultdata_list)
-def amp_Model_Select_pipeline(filename):
+def ampper_Model_Select_pipeline(filename):
     N = 10
     P1 = 0.2
     P2 = 0.8
@@ -2398,7 +2467,6 @@ def AHCom_Model_Select():
             A_Hratio = (1/(1+float(AHComitem[9]))-1)*100
             for filename in os.listdir(stockdata_path):
                 if(str(AHComitem[2]).zfill(7)==filename.split(".")[0][-7:]):
-                    print(filename)
                     _, HKdata_list = read_csvfile(HKfilename)
                     _, CNdata_list = read_csvfile(os.path.join(stockdata_path, filename))
                     stockinfo = filename.split(".")[0]
@@ -3578,18 +3646,22 @@ def analyze_stockdata():
 #    RSRS_Model_Select()
     RSRS_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tRSRS_Model_Select Finished!")
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tobv_Model_Select Begin!")
-#    obv_Model_Select()
-    obv_Model_Select_par()
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tobv_Model_Select Finished!")
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tstd_Model_Select Begin!")
-#    std_Model_Select()
-    std_Model_Select_par()
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tstd_Model_Select Finished!")
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tamp_Model_Select Begin!")
-#    amp_Model_Select()
-    amp_Model_Select_par()
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tamp_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tOBV_Model_Select Begin!")
+#    OBV_Model_Select()
+    OBV_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tOBV_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tobvper_Model_Select Begin!")
+#    obvper_Model_Select()
+    obvper_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tobvper_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tstdper_Model_Select Begin!")
+#    stdper_Model_Select()
+    stdper_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tstdper_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tampper_Model_Select Begin!")
+#    ampper_Model_Select()
+    ampper_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tampper_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tobvMACD_Model_Select Begin!")
 #    obvMACD_Model_Select()
     obvMACD_Model_Select_par()
