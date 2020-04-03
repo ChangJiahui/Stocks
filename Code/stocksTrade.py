@@ -198,18 +198,21 @@ def trade_analyze():
 
     def RSRS_Model_Trade_pipeline(stockdata_list):
         strvar = ""
-        N = 18
-        P1 = 0.8
-        P2 = 1.0
+        N = 16
+        P1 = 0.1
+        P2 = 0.9
         closingprice = float(stockdata_list[0][3])
         perioddaynum = min(10, len(stockdata_list)-N)
-        if(perioddaynum<10):
+        if(perioddaynum<100):
             return strvar
         closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N]]
         upperprice_list = [float(item[4]) for item in stockdata_list[:perioddaynum+N]]
         lowerprice_list = [float(item[5]) for item in stockdata_list[:perioddaynum+N]]
         beta_list = [0]*perioddaynum
+        betadist_list = [0]*perioddaynum
         rsquared_list = [0]*perioddaynum
+        zscore_list = [0]*perioddaynum
+        zscoredist_list = [0]*perioddaynum
         for ii in reversed(range(perioddaynum)):
             model = sm.OLS(upperprice_list[ii:ii+N], sm.add_constant(lowerprice_list[ii:ii+N]))
             modelfit = model.fit()
@@ -217,10 +220,21 @@ def trade_analyze():
             r2 = modelfit.rsquared
             beta_list[ii] = beta
             rsquared_list[ii] = r2
-        if((beta_list[1]<P2) and (beta_list[0]>P2)):
+            zscore_list[ii] = beta*r2
+        betasort_list = sorted(beta_list)
+        for ii in range(perioddaynum):
+            betadist_list[ii] = betasort_list.index(beta_list[ii])/perioddaynum
+        zscoresort_list = sorted(zscore_list)
+        for ii in range(perioddaynum):
+            zscoredist_list[ii] = zscoresort_list.index(zscore_list[ii])/perioddaynum
+        if((zscoredist_list[0]<P2) and (zscoredist_list[0]>P2)):
             strvar = "\tRSRS突破买入信号 买入价格: " + str(stockdata_list[0][3]) + "\n"
-        if((beta_list[1]>P1) and (beta_list[0]<P1)):
+        elif((zscoredist_list[0]>P2) and (zscoredist_list[0]<P2)):
+            strvar = "\tRSRS回归卖出信号 卖出价格: " + str(stockdata_list[0][3]) + "\n"
+        elif((zscoredist_list[0]>P1) and (zscoredist_list[0]<P2)):
             strvar = "\tRSRS突破卖出信号 卖出价格: " + str(stockdata_list[0][3]) + "\n"
+        elif((zscoredist_list[0]<P1) and (zscoredist_list[0]>P2)):
+            strvar = "\tRSRS回归买入信号 买入价格: " + str(stockdata_list[0][3]) + "\n"
         return strvar
 
 
@@ -549,6 +563,90 @@ def trade_analyze():
             strvar = "\tobv死叉卖出信号 卖出价格: " + str(round(closingprice_list[0],2)) + "\n"
         return strvar
 
+    def obvtrend_Model_Trade_pipeline(stockdata_list):
+        strvar = ""
+        N1 = 10
+        N2 = 30
+        closingprice = float(stockdata_list[0][3])
+        perioddaynum = min(500, len(stockdata_list)-N2)
+        if(perioddaynum<300):
+            return strvar
+        closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N2]]
+        obv_list = [float(item[10]) for item in stockdata_list[:perioddaynum+N2]]
+        MA1_list = [0]*perioddaynum
+        MA2_list = [0]*perioddaynum
+        DIFF_list = [0]*perioddaynum
+        DIFFratio_list = [0]*perioddaynum
+        for ii in range(perioddaynum):
+            MA1 = np.mean([obv_list[ii:ii+N1]])
+            MA2 = np.mean([obv_list[ii:ii+N2]])
+            DIFF = MA1-MA2
+            MA1_list[ii] = MA1
+            MA2_list[ii] = MA2
+            DIFF_list[ii] = DIFF
+            DIFFratio_list[ii] = DIFF/obv_list[ii]
+        if((DIFF_list[1]<0) and (DIFF_list[0]>0)):
+            strvar = "\tobvtrend金叉买入信号 买入价格: " + str(round(closingprice_list[0],2)) + "\n"
+        if((DIFF_list[1]>0) and (DIFF_list[0]<0)):
+            strvar = "\tobvtrend死叉卖出信号 卖出价格: " + str(round(closingprice_list[0],2)) + "\n"
+        return strvar
+
+    def stdtrend_Model_Trade_pipeline(stockdata_list):
+        strvar = ""
+        N1 = 10
+        N2 = 30
+        closingprice = float(stockdata_list[0][3])
+        perioddaynum = min(500, len(stockdata_list)-N2)
+        if(perioddaynum<300):
+            return strvar
+        closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N2]]
+        MA1_list = [0]*perioddaynum
+        MA2_list = [0]*perioddaynum
+        DIFF_list = [0]*perioddaynum
+        DIFFratio_list = [0]*perioddaynum
+        for ii in range(perioddaynum):
+            MA1 = np.std(closingprice_list[ii:ii+N1])/np.mean(closingprice_list[ii:ii+N1])*100
+            MA2 = np.std(closingprice_list[ii:ii+N2])/np.mean(closingprice_list[ii:ii+N2])*100
+            DIFF = MA1-MA2
+            MA1_list[ii] = MA1
+            MA2_list[ii] = MA2
+            DIFF_list[ii] = DIFF
+            DIFFratio_list[ii] = DIFF/closingprice_list[ii]
+        if((DIFF_list[1]<0) and (DIFF_list[0]>0)):
+            strvar = "\tstdtrend金叉买入信号 买入价格: " + str(round(closingprice_list[0],2)) + "\n"
+        if((DIFF_list[1]>0) and (DIFF_list[0]<0)):
+            strvar = "\tstdtrend死叉卖出信号 卖出价格: " + str(round(closingprice_list[0],2)) + "\n"
+        return strvar
+
+    def amptrend_Model_Trade_pipeline(stockdata_list):
+        strvar = ""
+        N1 = 10
+        N2 = 30
+        closingprice = float(stockdata_list[0][3])
+        perioddaynum = min(500, len(stockdata_list)-N2)
+        if(perioddaynum<300):
+            return strvar
+        closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N2]]
+        upperprice_list = [float(item[4]) for item in stockdata_list[:perioddaynum+N2]]
+        lowerprice_list = [float(item[5]) for item in stockdata_list[:perioddaynum+N2]]
+        MA1_list = [0]*perioddaynum
+        MA2_list = [0]*perioddaynum
+        DIFF_list = [0]*perioddaynum
+        DIFFratio_list = [0]*perioddaynum
+        for ii in range(perioddaynum):
+            MA1 = np.mean([(upperprice_list[jj]-lowerprice_list[jj])/closingprice_list[jj] for jj in range(ii, ii+N1)])
+            MA2 = np.mean([(upperprice_list[jj]-lowerprice_list[jj])/closingprice_list[jj] for jj in range(ii, ii+N2)])
+            DIFF = MA1-MA2
+            MA1_list[ii] = MA1
+            MA2_list[ii] = MA2
+            DIFF_list[ii] = DIFF
+            DIFFratio_list[ii] = DIFF/closingprice_list[ii]
+        if((DIFF_list[1]<0) and (DIFF_list[0]>0)):
+            strvar = "\tamptrend金叉买入信号 买入价格: " + str(round(closingprice_list[0],2)) + "\n"
+        if((DIFF_list[1]>0) and (DIFF_list[0]<0)):
+            strvar = "\tamptrend死叉卖出信号 卖出价格: " + str(round(closingprice_list[0],2)) + "\n"
+        return strvar
+
     resultstr = ""
     index_list = ["上证指数_0000001", "深证成指_1399001"]
     for ii in range(len(index_list)):
@@ -563,7 +661,9 @@ def trade_analyze():
                               + MACD_Model_Trade_pipeline(indexdata_list) \
                               + KDJ_Model_Trade_pipeline(indexdata_list) \
                               + DMI_Model_Trade_pipeline(indexdata_list) \
-                              + trend1T5_Model_Select_pipeline(indexdata_list)
+                              + trend1T5_Model_Select_pipeline(indexdata_list) \
+                              + amptrend_Model_Trade_pipeline(indexdata_list) \
+                              + stdtrend_Model_Trade_pipeline(indexdata_list)
     title, trade_list = read_csvfile(accountbook_path)
 #    title = ["股票名称", "成本价格", "持仓数量", "最近交易价格", "最近交易数量", "低位价格", "高位价格", "跌3%价格", "涨3%价格", "当前价格", "持仓市值", "最近交易市值", "盈利比例"]
     for ii in range(len(trade_list)):
@@ -590,6 +690,9 @@ def trade_analyze():
                                   + EMV_Model_Trade_pipeline(stockdata_list) \
                                   + trend1T5_Model_Select_pipeline(stockdata_list) \
                                   + OBV_Model_Trade_pipeline(stockdata_list) \
+                                  + obvtrend_Model_Trade_pipeline(stockdata_list) \
+                                  + amptrend_Model_Trade_pipeline(stockdata_list) \
+                                  + stdtrend_Model_Trade_pipeline(stockdata_list) \
                                   + point_Model_Trade_pipeline(trade_list[ii], stockdata_list)
         else:
             resultstr = stockinfo + " 股票名称错误!" + '\n' + resultstr
