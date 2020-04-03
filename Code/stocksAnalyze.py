@@ -1014,6 +1014,78 @@ def obvper_Model_Select_pipeline(filename):
     return []
 
 
+def obvtrend_Model_Select():
+# 成交量放大日线模型
+    resultfile_path = os.path.join(resultdata_path, "obvtrend_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "10日obv线上穿预测天数", "30日obv线下方天数", "股票上穿前总跌幅", "DIFF", "DIFF比例", "百日最大下方天数", "百日最大上穿前跌幅", "百日最大DIFF", "日期", "百日最大DIFF比例", "日期"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(obvtrend_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def obvtrend_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "obvtrend_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "10日obv线上穿预测天数", "30日obv线下方天数", "股票上穿前总跌幅", "DIFF", "DIFF比例", "百日最大下方天数", "百日最大上穿前跌幅", "百日最大DIFF", "日期", "百日最大DIFF比例", "日期"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(obvtrend_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def obvtrend_Model_Select_pipeline(filename):
+    N1 = 10
+    N2 = 30
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    closingprice = float(stockdata_list[0][3])
+    perioddaynum = min(500, len(stockdata_list)-N2)
+    if(perioddaynum<300):
+        return []
+    closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N2]]
+    obv_list = [float(item[10]) for item in stockdata_list[:perioddaynum+N2]]
+    MA1_list = [0]*perioddaynum
+    MA2_list = [0]*perioddaynum
+    DIFF_list = [0]*perioddaynum
+    DIFFratio_list = [0]*perioddaynum
+    for ii in range(perioddaynum):
+        MA1 = np.mean([obv_list[ii:ii+N1]])
+        MA2 = np.mean([obv_list[ii:ii+N2]])
+        DIFF = MA1-MA2
+        MA1_list[ii] = MA1
+        MA2_list[ii] = MA2
+        DIFF_list[ii] = DIFF
+        DIFFratio_list[ii] = DIFF/obv_list[ii]
+    if((DIFF_list[1]<0) and (DIFF_list[0]>DIFF_list[1])):
+        modelcounter = 1
+        for ii in range(1, perioddaynum):
+            if(DIFF_list[ii]<0):
+                modelcounter += 1
+            else:
+                break
+        modelrange = (closingprice/closingprice_list[modelcounter]-1)*100
+        modelpredict = math.ceil(DIFF_list[0]/(DIFF_list[1]-DIFF_list[0]))
+        minDIFF = min(DIFF_list[:min(200, perioddaynum)])
+        minDIFFdate = stockdata_list[DIFF_list[:min(200, perioddaynum)].index(minDIFF)][0]
+        minDIFFratio = min(DIFFratio_list[:min(200, perioddaynum)])
+        minDIFFratiodate = stockdata_list[DIFFratio_list[:min(200, perioddaynum)].index(minDIFFratio)][0]
+        maxmodelcounter = 0
+        maxmodelrange = 0
+        for ii in range(modelcounter, min(200, perioddaynum)):
+            tempmodelcounter = 0
+            tempmodelrange = 0
+            for jj in range(ii, perioddaynum):
+                if(DIFF_list[jj]<0):
+                    tempmodelcounter += 1
+                else:
+                    tempmodelrange = (closingprice_list[ii]/closingprice_list[ii+tempmodelcounter]-1)*100
+                    if(maxmodelcounter<tempmodelcounter):
+                        maxmodelcounter = tempmodelcounter
+                    if(maxmodelrange>tempmodelrange):
+                        maxmodelrange = tempmodelrange
+                    break
+        if(modelrange<maxmodelrange*2/3):
+            return [stockinfo, stockdata_list[0][9], modelpredict, modelcounter, modelrange, DIFF_list[0], DIFFratio_list[0], maxmodelcounter, maxmodelrange, minDIFF, minDIFFdate, minDIFFratio, minDIFFratiodate]
+    return []
+
+
 def stdper_Model_Select():
 # 10日标准差历史择时模型
     resultfile_path = os.path.join(resultdata_path, "stdper_Model_Select_Result.csv")
@@ -1075,6 +1147,77 @@ def stdper_Model_Select_pipeline(filename):
         lastfailrange = (minprice_list[1]/maxprice_list[1]-1)*100
         if(reboundrange<20):
             return [stockinfo, stockdata_list[0][9], stddist_list[0], reboundrange, reboundcounter, failrange, failcounter, lastreboundrange, lastreboundcounter, lastfailrange, lastfailcounter]
+    return []
+
+
+def stdtrend_Model_Select():
+# 标准差日线模型
+    resultfile_path = os.path.join(resultdata_path, "stdtrend_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "10日std线上穿预测天数", "30日std线下方天数", "股票上穿前总跌幅", "DIFF", "DIFF比例", "百日最大下方天数", "百日最大上穿前跌幅", "百日最大DIFF", "日期", "百日最大DIFF比例", "日期"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(stdtrend_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def stdtrend_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "stdtrend_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "10日std线上穿预测天数", "30日std线下方天数", "股票上穿前总跌幅", "DIFF", "DIFF比例", "百日最大下方天数", "百日最大上穿前跌幅", "百日最大DIFF", "日期", "百日最大DIFF比例", "日期"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(stdtrend_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def stdtrend_Model_Select_pipeline(filename):
+    N1 = 10
+    N2 = 30
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    closingprice = float(stockdata_list[0][3])
+    perioddaynum = min(500, len(stockdata_list)-N2)
+    if(perioddaynum<300):
+        return []
+    closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N2]]
+    MA1_list = [0]*perioddaynum
+    MA2_list = [0]*perioddaynum
+    DIFF_list = [0]*perioddaynum
+    DIFFratio_list = [0]*perioddaynum
+    for ii in range(perioddaynum):
+        MA1 = np.std(closingprice_list[ii:ii+N1])/np.mean(closingprice_list[ii:ii+N1])*100
+        MA2 = np.std(closingprice_list[ii:ii+N2])/np.mean(closingprice_list[ii:ii+N2])*100
+        DIFF = MA1-MA2
+        MA1_list[ii] = MA1
+        MA2_list[ii] = MA2
+        DIFF_list[ii] = DIFF
+        DIFFratio_list[ii] = DIFF/closingprice_list[ii]
+    if((DIFF_list[1]<0) and (DIFF_list[0]>DIFF_list[1])):
+        modelcounter = 1
+        for ii in range(1, perioddaynum):
+            if(DIFF_list[ii]<0):
+                modelcounter += 1
+            else:
+                break
+        modelrange = (closingprice/closingprice_list[modelcounter]-1)*100
+        modelpredict = math.ceil(DIFF_list[0]/(DIFF_list[1]-DIFF_list[0]))
+        minDIFF = min(DIFF_list[:min(200, perioddaynum)])
+        minDIFFdate = stockdata_list[DIFF_list[:min(200, perioddaynum)].index(minDIFF)][0]
+        minDIFFratio = min(DIFFratio_list[:min(200, perioddaynum)])
+        minDIFFratiodate = stockdata_list[DIFFratio_list[:min(200, perioddaynum)].index(minDIFFratio)][0]
+        maxmodelcounter = 0
+        maxmodelrange = 0
+        for ii in range(modelcounter, min(200, perioddaynum)):
+            tempmodelcounter = 0
+            tempmodelrange = 0
+            for jj in range(ii, perioddaynum):
+                if(DIFF_list[jj]<0):
+                    tempmodelcounter += 1
+                else:
+                    tempmodelrange = (closingprice_list[ii]/closingprice_list[ii+tempmodelcounter]-1)*100
+                    if(maxmodelcounter<tempmodelcounter):
+                        maxmodelcounter = tempmodelcounter
+                    if(maxmodelrange>tempmodelrange):
+                        maxmodelrange = tempmodelrange
+                    break
+        if(modelrange<maxmodelrange*2/3):
+            return [stockinfo, stockdata_list[0][9], modelpredict, modelcounter, modelrange, DIFF_list[0], DIFFratio_list[0], maxmodelcounter, maxmodelrange, minDIFF, minDIFFdate, minDIFFratio, minDIFFratiodate]
     return []
 
 
@@ -1141,6 +1284,79 @@ def ampper_Model_Select_pipeline(filename):
         lastfailrange = (minprice_list[1]/maxprice_list[1]-1)*100
         if(reboundrange<20):
             return [stockinfo, stockdata_list[0][9], ampdist_list[0], reboundrange, reboundcounter, failrange, failcounter, lastreboundrange, lastreboundcounter, lastfailrange, lastfailcounter]
+    return []
+
+
+def amptrend_Model_Select():
+# 振幅日线模型
+    resultfile_path = os.path.join(resultdata_path, "amptrend_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "10日amp线上穿预测天数", "30日amp线下方天数", "股票上穿前总跌幅", "DIFF", "DIFF比例", "百日最大下方天数", "百日最大上穿前跌幅", "百日最大DIFF", "日期", "百日最大DIFF比例", "日期"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(amptrend_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def amptrend_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "amptrend_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "10日amp线上穿预测天数", "30日amp线下方天数", "股票上穿前总跌幅", "DIFF", "DIFF比例", "百日最大下方天数", "百日最大上穿前跌幅", "百日最大DIFF", "日期", "百日最大DIFF比例", "日期"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(amptrend_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def amptrend_Model_Select_pipeline(filename):
+    N1 = 10
+    N2 = 30
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    closingprice = float(stockdata_list[0][3])
+    perioddaynum = min(500, len(stockdata_list)-N2)
+    if(perioddaynum<300):
+        return []
+    closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N2]]
+    upperprice_list = [float(item[4]) for item in stockdata_list[:perioddaynum+N2]]
+    lowerprice_list = [float(item[5]) for item in stockdata_list[:perioddaynum+N2]]
+    MA1_list = [0]*perioddaynum
+    MA2_list = [0]*perioddaynum
+    DIFF_list = [0]*perioddaynum
+    DIFFratio_list = [0]*perioddaynum
+    for ii in range(perioddaynum):
+        MA1 = np.mean([(upperprice_list[jj]-lowerprice_list[jj])/closingprice_list[jj] for jj in range(ii, ii+N1)])
+        MA2 = np.mean([(upperprice_list[jj]-lowerprice_list[jj])/closingprice_list[jj] for jj in range(ii, ii+N2)])
+        DIFF = MA1-MA2
+        MA1_list[ii] = MA1
+        MA2_list[ii] = MA2
+        DIFF_list[ii] = DIFF
+        DIFFratio_list[ii] = DIFF/closingprice_list[ii]
+    if((DIFF_list[1]<0) and (DIFF_list[0]>DIFF_list[1])):
+        modelcounter = 1
+        for ii in range(1, perioddaynum):
+            if(DIFF_list[ii]<0):
+                modelcounter += 1
+            else:
+                break
+        modelrange = (closingprice/closingprice_list[modelcounter]-1)*100
+        modelpredict = math.ceil(DIFF_list[0]/(DIFF_list[1]-DIFF_list[0]))
+        minDIFF = min(DIFF_list[:min(200, perioddaynum)])
+        minDIFFdate = stockdata_list[DIFF_list[:min(200, perioddaynum)].index(minDIFF)][0]
+        minDIFFratio = min(DIFFratio_list[:min(200, perioddaynum)])
+        minDIFFratiodate = stockdata_list[DIFFratio_list[:min(200, perioddaynum)].index(minDIFFratio)][0]
+        maxmodelcounter = 0
+        maxmodelrange = 0
+        for ii in range(modelcounter, min(200, perioddaynum)):
+            tempmodelcounter = 0
+            tempmodelrange = 0
+            for jj in range(ii, perioddaynum):
+                if(DIFF_list[jj]<0):
+                    tempmodelcounter += 1
+                else:
+                    tempmodelrange = (closingprice_list[ii]/closingprice_list[ii+tempmodelcounter]-1)*100
+                    if(maxmodelcounter<tempmodelcounter):
+                        maxmodelcounter = tempmodelcounter
+                    if(maxmodelrange>tempmodelrange):
+                        maxmodelrange = tempmodelrange
+                    break
+        if(modelrange<maxmodelrange*2/3):
+            return [stockinfo, stockdata_list[0][9], modelpredict, modelcounter, modelrange, DIFF_list[0], DIFFratio_list[0], maxmodelcounter, maxmodelrange, minDIFF, minDIFFdate, minDIFFratio, minDIFFratiodate]
     return []
 
 
@@ -3654,14 +3870,26 @@ def analyze_stockdata():
 #    obvper_Model_Select()
     obvper_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tobvper_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tobvtrend_Model_Select Begin!")
+#    obvtrend_Model_Select()
+    obvtrend_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tobvtrend_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tstdper_Model_Select Begin!")
 #    stdper_Model_Select()
     stdper_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tstdper_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tstdtrend_Model_Select Begin!")
+#    stdtrend_Model_Select()
+    stdtrend_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tstdtrend_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tampper_Model_Select Begin!")
 #    ampper_Model_Select()
     ampper_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tampper_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tamptrend_Model_Select Begin!")
+#    amptrend_Model_Select()
+    amptrend_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tamptrend_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tobvMACD_Model_Select Begin!")
 #    obvMACD_Model_Select()
     obvMACD_Model_Select_par()
