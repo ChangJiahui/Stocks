@@ -579,6 +579,54 @@ def drop_Model_Select_pipeline(filename):
     return []
 
 
+def gap_Model_Select():
+# 缺口理论模型
+    resultfile_path = os.path.join(resultdata_path, "gap_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "连续跳空数量", "最近跳空天数", "最近跌幅", "总跳空天数", "总跌幅", "最近跳空幅度", "最大跳空幅度", "百日位置(%)"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(gap_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def gap_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "gap_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "连续跳空数量", "最近跳空天数", "最近跌幅", "总跳空天数", "总跌幅", "最近跳空幅度", "最大跳空幅度", "百日位置(%)"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(gap_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def gap_Model_Select_pipeline(filename):
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    closingprice = float(stockdata_list[0][3])
+    perioddaynum = min(200, len(stockdata_list)-1)
+    if(perioddaynum<200):
+        return []    
+    closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+1]]
+    upperprice_list = [float(item[4]) for item in stockdata_list[:perioddaynum+1]]
+    lowerprice_list = [float(item[5]) for item in stockdata_list[:perioddaynum+1]]
+    gapoffset_list = []
+    gaprange_list = []
+    gapcounter = 0
+    for ii in range(1, perioddaynum):
+        if(upperprice_list[ii]<lowerprice_list[ii+1]):
+            if(max(upperprice_list[:ii+1])<lowerprice_list[ii+1]):
+                gapcounter += 1
+                gapoffset_list.append(ii)
+                gaprange_list.append((upperprice_list[ii]/lowerprice_list[ii+1]-1)*100)
+            else:
+                break
+    if(gapcounter>2):
+        modelrange1 = (closingprice/closingprice_list[gapoffset_list[0]]-1)*100
+        modelrange2 = (closingprice/closingprice_list[gapoffset_list[-1]]-1)*100
+        lowerprice = float(stockdata_list[0][5])
+        maxprice = max(closingprice_list[:min(100, perioddaynum)])
+        minprice = min(closingprice_list[:min(100, perioddaynum)])
+        reboundrange = (closingprice-minprice)/(maxprice-minprice)*100
+        return [stockinfo, stockdata_list[0][9], gapcounter, gapoffset_list[0], modelrange1, gapoffset_list[-1], modelrange2, gaprange_list[0], min(gaprange_list), reboundrange]
+    return []
+
+
 def rise_Model_Select():
 # 连续多日上涨(&阳线)模型
     resultfile_path = os.path.join(resultdata_path, "rise_Model_Select_Result.csv")
@@ -3822,6 +3870,10 @@ def analyze_stockdata():
 #    drop_Model_Select()
     drop_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tdrop_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tgap_Model_Select Begin!")
+#    gap_Model_Select()
+    gap_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tgap_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\trise_Model_Select Begin!")
 #    rise_Model_Select()
     rise_Model_Select_par()
