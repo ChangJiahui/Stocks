@@ -136,6 +136,25 @@ def trade_analyze():
         return strvar
 
 
+    def gap_Model_Trade_pipeline(stockdata_list):
+        strvar = ""
+        closingprice = float(stockdata_list[0][3])
+        perioddaynum = min(20, len(stockdata_list)-1)
+        if(perioddaynum<20):
+            return strvar
+        closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+1]]
+        upperprice_list = [float(item[4]) for item in stockdata_list[:perioddaynum+1]]
+        lowerprice_list = [float(item[5]) for item in stockdata_list[:perioddaynum+1]]
+        for ii in range(1, perioddaynum):
+            if((upperprice_list[ii]<lowerprice_list[ii+1]) and (max(upperprice_list[:ii+1])<lowerprice_list[ii+1])):
+                strvar = "\t跳空下跌买入信号 买入价格: " + str(round(max(upperprice_list[:ii+1]),2)) + "\n"
+                break
+            if((lowerprice_list[ii]>upperprice_list[ii+1]) and (min(lowerprice_list[:ii+1])>lowerprice_list[ii+1])):
+                strvar = "\t跳空上涨卖出信号 卖出价格: " + str(round(min(lowerprice_list[:ii+1]),2)) + "\n"
+                break
+        return strvar
+
+
     def BOLL_Model_Trade_pipeline(stockdata_list):
         strvar = ""
         N1 = 20
@@ -658,6 +677,7 @@ def trade_analyze():
                               + BOLL_Model_Trade_pipeline(indexdata_list) \
                               + parting_Model_Trade_pipeline(indexdata_list) \
                               + RSRS_Model_Trade_pipeline(indexdata_list) \
+                              + gap_Model_Trade_pipeline(indexdata_list) \
                               + MACD_Model_Trade_pipeline(indexdata_list) \
                               + KDJ_Model_Trade_pipeline(indexdata_list) \
                               + DMI_Model_Trade_pipeline(indexdata_list) \
@@ -684,6 +704,7 @@ def trade_analyze():
                                   + BOLL_Model_Trade_pipeline(stockdata_list) \
                                   + parting_Model_Trade_pipeline(stockdata_list) \
                                   + RSRS_Model_Trade_pipeline(stockdata_list) \
+                                  + gap_Model_Trade_pipeline(stockdata_list) \
                                   + MACD_Model_Trade_pipeline(stockdata_list) \
                                   + KDJ_Model_Trade_pipeline(stockdata_list) \
                                   + DMI_Model_Trade_pipeline(stockdata_list) \
