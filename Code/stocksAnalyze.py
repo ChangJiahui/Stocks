@@ -291,14 +291,14 @@ def get_stockdata():
 def EHBF_Analyze():
 # 横盘天数 & 振幅 & EMA & earnratio & PE & PB
     resultfile_path = os.path.join(resultdata_path, "EHBF_Analyze_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "历史位置(%)", "百日位置(%)", "总交易日", "主力控盘比例", "获利持仓比例", "压力筹码比例", "支撑筹码比例", "总市值", "流通市值", "10日标准差分位", "20日标准差分位", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均10日振幅分位", "平均20日振幅分位", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅"]
+    title = ["股票名称", "当日收盘价(元)", "当日涨跌幅(%)", "当日成交额(万元)", "当日换手率", "历史位置(%)", "百日位置(%)", "总交易日", "主力控盘比例", "获利持仓比例", "压力筹码比例", "支撑筹码比例", "总市值", "流通市值", "10日标准差分位", "20日标准差分位", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均10日振幅分位", "平均20日振幅分位", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         resultdata_list.append(EHBF_Analyze_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
 def EHBF_Analyze_par():
     resultfile_path = os.path.join(resultdata_path, "EHBF_Analyze_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "历史位置(%)", "百日位置(%)", "总交易日", "主力控盘比例", "获利持仓比例", "压力筹码比例", "支撑筹码比例", "总市值", "流通市值", "10日标准差分位", "20日标准差分位", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均10日振幅分位", "平均20日振幅分位", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅"]
+    title = ["股票名称", "当日收盘价(元)", "当日涨跌幅(%)", "当日成交额(万元)", "当日换手率", "历史位置(%)", "百日位置(%)", "总交易日", "主力控盘比例", "获利持仓比例", "压力筹码比例", "支撑筹码比例", "总市值", "流通市值", "10日标准差分位", "20日标准差分位", "5%横盘天数", "10%横盘天数", "20%横盘天数", "平均10日振幅分位", "平均20日振幅分位", "6日超跌(-6)", "12日超跌(-10)", "24日超跌(-16)", "30日跌幅"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(EHBF_Analyze_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -449,7 +449,7 @@ def EHBF_Analyze_pipeline(filename):
     pressureratio, supportratio, earnratio, cywratio = earnratio_Analyze(stockdata_list)
     amplitude10, amplitude20 = amplitude_Analyze(stockdata_list)
     drop30range = (closingprice/closingprice_list[min(30,perioddaynum-1)]-1)*100
-    return [stockinfo, stockdata_list[0][9], reboundrange1, reboundrange2, len(stockdata_list), cywratio, earnratio, pressureratio, supportratio, stockdata_list[0][13], stockdata_list[0][14], std10, std20, stable5counter, stable10counter, stable20counter, amplitude10, amplitude20, EMA6range, EMA12range, EMA24range, drop30range]
+    return [stockinfo, closingprice, stockdata_list[0][9], stockdata_list[0][12], stockdata_list[0][10], reboundrange1, reboundrange2, len(stockdata_list), cywratio, earnratio, pressureratio, supportratio, stockdata_list[0][13], stockdata_list[0][14], std10, std20, stable5counter, stable10counter, stable20counter, amplitude10, amplitude20, EMA6range, EMA12range, EMA24range, drop30range]
 
 
 def value_Model_Select():
@@ -887,8 +887,12 @@ def RSRS_Model_Select_pipeline(filename):
     for ii in reversed(range(perioddaynum)):
         model = sm.OLS(upperprice_list[ii:ii+N], sm.add_constant(lowerprice_list[ii:ii+N]))
         modelfit = model.fit()
-        beta = modelfit.params[1]
-        r2 = modelfit.rsquared
+        if(len(modelfit.params)==2):
+            beta = modelfit.params[1]
+            r2 = modelfit.rsquared
+        else:
+            beta = 0
+            r2 = 0
         beta_list[ii] = beta
         rsquared_list[ii] = r2
         zscore_list[ii] = beta*r2
@@ -1882,6 +1886,83 @@ def KDJ_Model_Select_pipeline(filename):
     return []
 
 
+def CCI_Model_Select():
+# CCI 模型 n=14
+    resultfile_path = os.path.join(resultdata_path, "CCI_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "CCI上涨天数", "CCI上涨幅度", "CCI下跌天数", "CCI下跌幅度", "当日CCI", "百日最大下跌天数", "百日最大下跌幅度", "百日最低CCI值", "日期", "百日最高CCI值", "日期"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(CCI_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def CCI_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "CCI_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "CCI上涨天数", "CCI上涨幅度", "CCI下跌天数", "CCI下跌幅度", "当日CCI", "百日最大下跌天数", "百日最大下跌幅度", "百日最低CCI值", "日期", "百日最高CCI值", "日期"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(CCI_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def CCI_Model_Select_pipeline(filename):
+    N = 14
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    closingprice = float(stockdata_list[0][3])
+    perioddaynum = min(400, len(stockdata_list)-N)
+    if(perioddaynum<200):
+        return []
+    closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N]]
+    upperprice_list = [float(item[4]) for item in stockdata_list[:perioddaynum+N]]
+    lowerprice_list = [float(item[5]) for item in stockdata_list[:perioddaynum+N]]
+    TP_list = [0]*(perioddaynum+N)
+    MA_list = [0]*perioddaynum
+    MD_list = [0]*perioddaynum
+    CCI_list = [0]*perioddaynum
+    maxprice_list = []
+    minprice_list = []
+    maxoffset_list = []
+    minoffset_list = []
+    for ii in range(perioddaynum+N):
+        TP_list[ii] = (closingprice_list[ii]+upperprice_list[ii]+lowerprice_list[ii])/3
+    for ii in range(perioddaynum):
+        MA_list[ii] = np.mean(TP_list[ii:ii+N])
+        MD_list[ii] = np.mean(np.abs([TP_list[jj]-MA_list[ii] for jj in range(ii,ii+N)]))
+        CCI_list[ii] = (TP_list[ii]-MA_list[ii])/MD_list[ii]/0.015
+    for ii in range(1, perioddaynum-1):
+        if((CCI_list[ii]>CCI_list[ii-1]) and (CCI_list[ii]>CCI_list[ii+1])):
+            maxprice_list.append(closingprice_list[ii])
+            maxoffset_list.append(ii)
+        if((CCI_list[ii]<CCI_list[ii-1]) and (CCI_list[ii]<CCI_list[ii+1])):
+            minprice_list.append(closingprice_list[ii])
+            minoffset_list.append(ii)
+    if((len(minoffset_list)>3) and (len(maxoffset_list)>3) and (minoffset_list[0]<maxoffset_list[0])):
+        failrange = (minprice_list[0]/maxprice_list[0]-1)*100
+        failcounter = maxoffset_list[0]-minoffset_list[0]
+        reboundrange = (closingprice/minprice_list[0]-1)*100
+        reboundcounter = minoffset_list[0]
+        maxCCI = max(CCI_list[:min(100, perioddaynum)])
+        maxCCIdate = stockdata_list[CCI_list.index(maxCCI)][0]
+        minCCI = min(CCI_list[:min(100, perioddaynum)])
+        minCCIdate = stockdata_list[CCI_list.index(minCCI)][0]
+        maxmodelcounter = 0
+        maxmodelrange = 0
+        for ii in range(failcounter, min(100, perioddaynum)):
+            tempmodelcounter = 0
+            tempmodelrange = 0
+            for jj in range(ii, perioddaynum-1):
+                if(CCI_list[jj]<CCI_list[jj+1]):
+                    tempmodelcounter += 1
+                else:
+                    tempmodelrange = (closingprice_list[ii]/closingprice_list[ii+tempmodelcounter]-1)*100
+                    if(maxmodelcounter<tempmodelcounter):
+                        maxmodelcounter = tempmodelcounter
+                    if(maxmodelrange>tempmodelrange):
+                        maxmodelrange = tempmodelrange
+                    break
+        if(failrange<maxmodelrange*2/3):
+            return [stockinfo, stockdata_list[0][9], reboundcounter, reboundrange, failcounter, failrange, CCI_list[0], maxmodelcounter, maxmodelrange, minCCI, minCCIdate, maxCCI, maxCCIdate]
+    return []
+
+
 def BOLL_Model_Select():
 # BOLL 模型 N1=20 N2=2
     resultfile_path = os.path.join(resultdata_path, "BOLL_Model_Select_Result.csv")
@@ -2199,6 +2280,7 @@ def get_MACD_para(price_list, N1, N2, N3):
         DEAratio_list[ii] = DEAratio
         MACD_list[ii] = MACD
     return EMA1_list, EMA2_list, DIFF_list, DEA_list, DEAratio_list, MACD_list
+
 
 def EMV_Model_Select():
 # EMV 模型 (40,16) & 移动平均 EMVDIFF 模型
@@ -3098,21 +3180,6 @@ def get_MonthData(stockdata_list):
     return monthclosingprice_list, monthupperprice_list, monthlowerprice_list, monthvolumn_list
 
 
-def get_MonthData(stockdata_list):
-    monthstr = ""
-    monthoffset_list = []
-    for ii in range(len(stockdata_list)):
-        if(stockdata_list[ii][0].split("-")[1]!=monthstr):
-            monthstr = stockdata_list[ii][0].split("-")[1]
-            monthoffset_list.append(ii)
-    monthclosingprice_list = [float(stockdata_list[offset][3]) for offset in monthoffset_list]
-    monthoffset_list.append(len(stockdata_list))
-    monthupperprice_list = [max([float(stockdata_list[jj][4]) for jj in range(monthoffset_list[ii],monthoffset_list[ii+1])]) for ii in range(len(monthoffset_list)-1)]
-    monthlowerprice_list = [min([float(stockdata_list[jj][5]) for jj in range(monthoffset_list[ii],monthoffset_list[ii+1])]) for ii in range(len(monthoffset_list)-1)]
-    monthvolumn_list = [sum([float(stockdata_list[jj][10]) for jj in range(monthoffset_list[ii], monthoffset_list[ii+1])]) for ii in range(len(monthoffset_list)-1)]
-    return monthclosingprice_list, monthupperprice_list, monthlowerprice_list, monthvolumn_list
-
-
 def volumnMonth_Model_Select():
 # 放量模型
     resultfile_path = os.path.join(resultdata_path, "volumnMonth_Model_Select_Result.csv")
@@ -3406,6 +3473,84 @@ def KDJMonth_Model_Select_pipeline(filename):
                     break
         if(modelrange<maxmodelrange*2/3):
             return [stockinfo, monthrange0, monthrange1, round(modelpredict,2), modelcounter, modelrange, modelslope, Krange, K_list[0], D_list[0], J_list[0], RSV,maxmodelcounter, maxmodelrange]
+    return []
+
+
+def CCIMonth_Model_Select():
+# 月 CCI 模型 n=14
+    resultfile_path = os.path.join(resultdata_path, "CCIMonth_Model_Select_Result.csv")
+    title = ["股票名称", "当月涨跌幅", "前月涨跌幅", "CCI上涨月数", "CCI上涨幅度", "CCI下跌月数", "CCI下跌幅度", "当月CCI", "历史最大下跌月数", "历史最大下跌幅度"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(CCIMonth_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def CCIMonth_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "CCIMonth_Model_Select_Result.csv")
+    title = ["股票名称", "当月涨跌幅", "前月涨跌幅", "CCI上涨月数", "CCI上涨幅度", "CCI下跌月数", "CCI下跌幅度", "当月CCI", "历史最大下跌月数", "历史最大下跌幅度"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(CCIMonth_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def CCIMonth_Model_Select_pipeline(filename):
+    N = 14
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    monthclosingprice_list, monthupperprice_list, monthlowerprice_list, _ = get_MonthData(stockdata_list)
+    monthclosingprice = monthclosingprice_list[0]
+    monthclosingprice_list = monthclosingprice_list[1:]
+    monthupperprice = monthupperprice_list[0]
+    monthupperprice_list = monthupperprice_list[1:]
+    monthlowerprice = monthlowerprice_list[0]
+    monthlowerprice_list = monthlowerprice_list[1:]
+    periodmonthnum = min(100, len(monthclosingprice_list)-N)
+    if(periodmonthnum<10):
+        return []
+    TP_list = [0]*(periodmonthnum+N)
+    MA_list = [0]*periodmonthnum
+    MD_list = [0]*periodmonthnum
+    CCI_list = [0]*periodmonthnum
+    maxprice_list = []
+    minprice_list = []
+    maxoffset_list = []
+    minoffset_list = []
+    for ii in range(periodmonthnum+N):
+        TP_list[ii] = (monthclosingprice_list[ii]+monthupperprice_list[ii]+monthlowerprice_list[ii])/3
+    for ii in range(periodmonthnum):
+        MA_list[ii] = np.mean(TP_list[ii:ii+N])
+        MD_list[ii] = np.mean(np.abs([TP_list[jj]-MA_list[ii] for jj in range(ii,ii+N)]))
+        CCI_list[ii] = (TP_list[ii]-MA_list[ii])/MD_list[ii]/0.015
+    for ii in range(1, periodmonthnum-1):
+        if((CCI_list[ii]>CCI_list[ii-1]) and (CCI_list[ii]>CCI_list[ii+1])):
+            maxprice_list.append(monthclosingprice_list[ii])
+            maxoffset_list.append(ii)
+        if((CCI_list[ii]<CCI_list[ii-1]) and (CCI_list[ii]<CCI_list[ii+1])):
+            minprice_list.append(monthclosingprice_list[ii])
+            minoffset_list.append(ii)
+    if((len(minoffset_list)>3) and (len(maxoffset_list)>3) and (minoffset_list[0]<maxoffset_list[0])):
+        failrange = (minprice_list[0]/maxprice_list[0]-1)*100
+        failcounter = maxoffset_list[0]-minoffset_list[0]
+        reboundrange = (monthclosingprice_list[0]/minprice_list[0]-1)*100
+        reboundcounter = minoffset_list[0]
+        monthrange0 = (monthclosingprice/monthclosingprice_list[0]-1)*100
+        monthrange1 = (monthclosingprice_list[0]/monthclosingprice_list[1]-1)*100
+        maxmodelcounter = 0
+        maxmodelrange = 0
+        for ii in range(failcounter, periodmonthnum):
+            tempmodelcounter = 0
+            tempmodelrange = 0
+            for jj in range(ii, periodmonthnum-1):
+                if(CCI_list[jj]<CCI_list[jj+1]):
+                    tempmodelcounter += 1
+                else:
+                    tempmodelrange = (monthclosingprice_list[ii]/monthclosingprice_list[ii+tempmodelcounter]-1)*100
+                    if(maxmodelcounter<tempmodelcounter):
+                        maxmodelcounter = tempmodelcounter
+                    if(maxmodelrange>tempmodelrange):
+                        maxmodelrange = tempmodelrange
+                    break
+        if(failrange<maxmodelrange*2/3):
+            return [stockinfo, monthrange0, monthrange1, reboundcounter, reboundrange, failcounter, failrange, CCI_list[0], maxmodelcounter, maxmodelrange]
     return []
 
 
@@ -3894,6 +4039,10 @@ def analyze_stockdata():
 #    KDJ_Model_Select()
     KDJ_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tKDJ_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tCCI_Model_Select Begin!")
+#    CCI_Model_Select()
+    CCI_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tCCI_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tBOLL_Model_Select Begin!")
 #    BOLL_Model_Select()
     BOLL_Model_Select_par()
@@ -3978,6 +4127,10 @@ def analyze_stockdata():
 #    KDJMonth_Model_Select()
     KDJMonth_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tKDJMonth_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tCCIMonth_Model_Select Begin!")
+#    CCIMonth_Model_Select()
+    CCIMonth_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tCCIMonth_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tBOLLMonth_Model_Select Begin!")
 #    BOLLMonth_Model_Select()
     BOLLMonth_Model_Select_par()
