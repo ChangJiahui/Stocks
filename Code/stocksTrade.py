@@ -389,6 +389,33 @@ def trade_analyze():
         return strvar
 
 
+    def CCI_Model_Trade_pipeline(stockdata_list):
+        strvar = ""
+        N = 14
+        closingprice = float(stockdata_list[0][3])
+        perioddaynum = min(400, len(stockdata_list)-N)
+        if(perioddaynum<200):
+            return strvar
+        closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N]]
+        upperprice_list = [float(item[4]) for item in stockdata_list[:perioddaynum+N]]
+        lowerprice_list = [float(item[5]) for item in stockdata_list[:perioddaynum+N]]
+        TP_list = [0]*(perioddaynum+N)
+        MA_list = [0]*perioddaynum
+        MD_list = [0]*perioddaynum
+        CCI_list = [0]*perioddaynum
+        for ii in range(perioddaynum+N):
+            TP_list[ii] = (closingprice_list[ii]+upperprice_list[ii]+lowerprice_list[ii])/3
+        for ii in range(perioddaynum):
+            MA_list[ii] = np.mean(TP_list[ii:ii+N])
+            MD_list[ii] = np.mean(np.abs([TP_list[jj]-MA_list[ii] for jj in range(ii,ii+N)]))
+            CCI_list[ii] = (TP_list[ii]-MA_list[ii])/MD_list[ii]/0.015
+        if((CCI_list[1]>CCI_list[0]) and (CCI_list[1]>CCI_list[2])):
+            strvar = "\tCCI拐点卖出信号 卖出价格: " + str(round(TP_list[0],2)) + "\n"
+        elif((CCI_list[1]<CCI_list[0]) and (CCI_list[1]<CCI_list[2])):
+            strvar = "\tCCI拐点买入信号 买入价格: " + str(round(TP_list[0],2)) + "\n"
+        return strvar
+
+
     def DMI_Model_Trade_pipeline(stockdata_list):
         strvar = ""
         N1 = 14
@@ -680,6 +707,7 @@ def trade_analyze():
                               + gap_Model_Trade_pipeline(indexdata_list) \
                               + MACD_Model_Trade_pipeline(indexdata_list) \
                               + KDJ_Model_Trade_pipeline(indexdata_list) \
+                              + CCI_Model_Trade_pipeline(indexdata_list) \
                               + DMI_Model_Trade_pipeline(indexdata_list) \
                               + trend1T5_Model_Select_pipeline(indexdata_list) \
                               + amptrend_Model_Trade_pipeline(indexdata_list) \
@@ -707,6 +735,7 @@ def trade_analyze():
                                   + gap_Model_Trade_pipeline(stockdata_list) \
                                   + MACD_Model_Trade_pipeline(stockdata_list) \
                                   + KDJ_Model_Trade_pipeline(stockdata_list) \
+                                  + CCI_Model_Trade_pipeline(stockdata_list) \
                                   + DMI_Model_Trade_pipeline(stockdata_list) \
                                   + EMV_Model_Trade_pipeline(stockdata_list) \
                                   + trend1T5_Model_Select_pipeline(stockdata_list) \
