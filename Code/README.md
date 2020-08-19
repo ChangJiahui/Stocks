@@ -11,6 +11,10 @@
 	+ 每日和讯基金数据下载
 	+ 计算量化分析模型结果 （并行/非并行） *_Model_Select()
 	+ ……
++ bondsAnalyze.py (每日运行可转债量化分析)
+	+ Tushare可转债数据下载
+	+ 计算量化分析模型结果 （并行/非并行） *_Model_Select()
+	+ ……
 + stocksAnalyze.py (每日运行股票量化分析)
 	+ Tunet 联网 （tunet.config）
 	+ 每日网易股票数据下载更新
