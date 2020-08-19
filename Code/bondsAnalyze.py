@@ -32,6 +32,7 @@ end_time = time.strftime('%Y%m%d',time.localtime(time.time()-24*3600))
 root_path = "D:\\Workspace\\Python\\Stocks"
 bond_file = os.path.join(root_path, "Data", "bond.csv")
 bondinfo_file = os.path.join(root_path, "Data", "bondinfo.txt")
+stockdata_path = os.path.join(root_path, "Data", "stock_data")
 bonddata_path = os.path.join(root_path, "Data", "bond_data")
 resultdata_path = os.path.join(root_path, "Result", "Bonds")
 if __name__=="__main__":
@@ -951,6 +952,170 @@ def get_MACD_para(price_list, N1, N2, N3):
     return EMA1_list, EMA2_list, DIFF_list, DEA_list, DEAratio_list, MACD_list
 
 
+def lagging_calc(comdata_list, perioddaynum):
+    perioddaynum = min(perioddaynum, len(comdata_list)-1)
+    laggingcounter = 0
+    for ii in range(perioddaynum):
+        if(float(comdata_list[ii][2])<float(comdata_list[ii][4])):
+            laggingcounter += 1
+    laggingrange = (float(comdata_list[0][3])-float(comdata_list[perioddaynum][3]))/float(comdata_list[perioddaynum][3])*100 - (float(comdata_list[0][1])-float(comdata_list[perioddaynum][1]))/float(comdata_list[perioddaynum][1])*100
+    return laggingcounter, laggingrange
+
+
+def lagging_Model_Select():
+# 与正股 相比滞后或领先幅度
+    title, bonddata_list = read_csvfile(bond_file)
+    resultfile_path1 = os.path.join(resultdata_path, "bondlagging_Model_Select_Result.csv")
+    resultfile_path2 = os.path.join(resultdata_path, "stocklagging_Model_Select_Result.csv")
+    title1 = ["债券名称", "当日涨跌幅", "债券总涨跌幅", "股票总涨跌幅", "债券总滞后幅", "总债券滞后天数", "百日最大连续滞后幅", "百日最大滞后天数", "30日总滞后幅", "30日滞后天数", "60日总滞后幅", "60日滞后天数", "100日总滞后幅", "100日滞后天数", "200日总滞后幅", "200日滞后天数", "500日总滞后幅", "500日滞后天数"]
+    title2 = ["股票名称", "当日涨跌幅", "股票总涨跌幅", "债券总涨跌幅", "股票总滞后幅", "总股票滞后天数", "百日最大连续滞后幅", "百日最大滞后天数", "30日总滞后幅", "30日滞后天数", "60日总滞后幅", "60日滞后天数", "100日总滞后幅", "100日滞后天数", "200日总滞后幅", "200日滞后天数", "500日总滞后幅", "500日滞后天数"]
+    resultdata_list1 = []
+    resultdata_list2 = []
+    for bonddata_item in bonddata_list:
+        bondlagging_result, stocklagging_result = lagging_Model_Select_pipeline(bonddata_item)
+        resultdata_list1.append(bondlagging_result)
+        resultdata_list2.append(stocklagging_result)
+    write_csvfile(resultfile_path1, title1, resultdata_list1)
+    write_csvfile(resultfile_path2, title2, resultdata_list2)
+def lagging_Model_Select_par():
+    title, bonddata_list = read_csvfile(bond_file)
+    resultfile_path1 = os.path.join(resultdata_path, "bondlagging_Model_Select_Result.csv")
+    resultfile_path2 = os.path.join(resultdata_path, "stocklagging_Model_Select_Result.csv")
+    title1 = ["债券名称", "当日涨跌幅", "债券总涨跌幅", "股票总涨跌幅", "债券总滞后幅", "总债券滞后天数", "百日最大连续滞后幅", "百日最大滞后天数", "30日总滞后幅", "30日滞后天数", "60日总滞后幅", "60日滞后天数", "100日总滞后幅", "100日滞后天数", "200日总滞后幅", "200日滞后天数", "500日总滞后幅", "500日滞后天数"]
+    title2 = ["股票名称", "当日涨跌幅", "股票总涨跌幅", "债券总涨跌幅", "股票总滞后幅", "总股票滞后天数", "百日最大连续滞后幅", "百日最大滞后天数", "30日总滞后幅", "30日滞后天数", "60日总滞后幅", "60日滞后天数", "100日总滞后幅", "100日滞后天数", "200日总滞后幅", "200日滞后天数", "500日总滞后幅", "500日滞后天数"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(lagging_Model_Select_pipeline, bonddata_list)
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path1, title1, [item[0] for item in resultdata_list])
+    write_csvfile(resultfile_path2, title2, [item[1] for item in resultdata_list])
+def lagging_Model_Select_pipeline(bonddata_item):
+    print(bonddata_item)
+    bondinfo = bonddata_item[1]+'_'+bonddata_item[0]
+    _, bonddata_list = read_csvfile(os.path.join(bonddata_path, bondinfo+'.csv'))
+    stockinfo = ""
+    stockdata_list = []
+    stockcode = bonddata_item[2].split('.')[0]
+    for filename in os.listdir(stockdata_path):
+        if(stockcode==filename[-10:-4]):
+            stockinfo = filename.split('.')[0]
+            _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    if((len(bonddata_list)<100) or (len(stockdata_list)<100)):
+        return [], []
+    bondlagging_result = []
+    stocklagging_result = []
+    offset1 = 0
+    offset2 = 0
+    comdata_list = []
+    while(True):
+        if(stockdata_list[offset1][0].replace('-','')>bonddata_list[offset2][1]):
+            comdata_list.append([stockdata_list[offset1][0], stockdata_list[offset1][3], stockdata_list[offset1][9], bonddata_list[offset2][6], 0, float(stockdata_list[offset1][3])/float(bonddata_list[offset2][6])])
+            offset1+=1
+        elif(stockdata_list[offset1][0].replace('-','')<bonddata_list[offset2][1]):
+            comdata_list.append([bonddata_list[offset2][1], stockdata_list[offset1][3], 0, bonddata_list[offset2][6], bonddata_list[offset2][8], float(stockdata_list[offset1][3])/float(bonddata_list[offset2][6])])
+            offset2+=1
+        else:
+            comdata_list.append([stockdata_list[offset1][0], stockdata_list[offset1][3], stockdata_list[offset1][9], bonddata_list[offset2][6], bonddata_list[offset2][8], float(stockdata_list[offset1][3])/float(bonddata_list[offset2][6])])
+            offset1+=1
+            offset2+=1
+        if(offset1==min(510,len(stockdata_list))):
+            break
+        if(offset2==min(510,len(bonddata_list))):
+            break
+    N1 = 12
+    N2 = 26
+    N3 = 9
+    EMA1_list, EMA2_list, DIFF_list, DEA_list, DEAratio_list, MACD_list = get_MACD_para([item[5] for item in comdata_list], N1, N2, N3)
+    if((MACD_list[1]<0) and (MACD_list[0]>MACD_list[1]) and (DEA_list[1]<0)):
+        laggingcounter = 0
+        for ii in range(len(MACD_list)):
+            if((MACD_list[ii]<0) or (DIFF_list[ii]<0)):
+                laggingcounter += 1
+            else:
+                break
+        stockrange = (float(comdata_list[0][1])/float(comdata_list[laggingcounter][1])-1)*100
+        bondrange = (float(comdata_list[0][3])/float(comdata_list[laggingcounter][3])-1)*100
+        laggingrange = bondrange - stockrange
+        lagging30counter, lagging30range = lagging_calc(comdata_list, 30)
+        lagging60counter, lagging60range = lagging_calc(comdata_list, 60)
+        lagging100counter, lagging100range = lagging_calc(comdata_list, 100)
+        lagging200counter, lagging200range = lagging_calc(comdata_list, 200)
+        lagging500counter, lagging500range = lagging_calc(comdata_list, 500)
+        maxlaggingcounter = 0
+        maxlaggingrange = 0
+        for ii in range(laggingcounter, min(100, len(comdata_list)-1)):
+            templaggingcounter = 0
+            templaggingrange = 0
+            for jj in range(ii, min(200, len(comdata_list)-1)):
+                if((MACD_list[jj]<0) or (DIFF_list[jj]<0)):
+                    templaggingcounter += 1
+                else:
+                    break
+                templaggingrange = (float(comdata_list[ii][3])/float(comdata_list[ii+templaggingcounter][3])-1)*100-(float(comdata_list[ii][1])/float(comdata_list[ii+templaggingcounter][1])-1)*100
+                if(maxlaggingrange<templaggingrange):
+                    maxlaggingrange=templaggingrange
+                if(maxlaggingcounter<templaggingcounter):
+                    maxlaggingcounter=templaggingcounter
+        if((laggingcounter>maxlaggingcounter/2) and (laggingrange>maxlaggingrange*2/3)):
+            stocklagging_result = [stockinfo, comdata_list[0][2], stockrange, bondrange, laggingrange, laggingcounter, maxlaggingrange, maxlaggingcounter, lagging30range, lagging30counter, lagging60range, lagging60counter, lagging100range, lagging100counter, lagging200range, lagging200counter, lagging500range, lagging500counter]
+    offset1 = 0
+    offset2 = 0
+    comdata_list = []
+    while(True):
+        if(stockdata_list[offset1][0].replace('-','')>bonddata_list[offset2][1]):
+            comdata_list.append([stockdata_list[offset1][0], bonddata_list[offset2][6], 0, stockdata_list[offset1][3], stockdata_list[offset1][9], float(bonddata_list[offset2][6])/float(stockdata_list[offset1][3])])
+            offset1+=1
+        elif(stockdata_list[offset1][0].replace('-','')<bonddata_list[offset2][1]):
+            comdata_list.append([bonddata_list[offset2][1], bonddata_list[offset2][6], bonddata_list[offset2][8], stockdata_list[offset1][3], 0, float(bonddata_list[offset2][6])/float(stockdata_list[offset1][3])])
+            offset2+=1
+        else:
+            comdata_list.append([stockdata_list[offset1][0], bonddata_list[offset2][6], bonddata_list[offset2][8], stockdata_list[offset1][3], stockdata_list[offset1][9], float(bonddata_list[offset2][6])/float(stockdata_list[offset1][3])])
+            offset1+=1
+            offset2+=1
+        if(offset1==min(510,len(stockdata_list))):
+            break
+        if(offset2==min(510,len(bonddata_list))):
+            break
+    N1 = 12
+    N2 = 26
+    N3 = 9
+    EMA1_list, EMA2_list, DIFF_list, DEA_list, DEAratio_list, MACD_list = get_MACD_para([item[5] for item in comdata_list], N1, N2, N3)
+    if((MACD_list[1]<0) and (MACD_list[0]>MACD_list[1]) and (DEA_list[1]<0)):
+        laggingcounter = 0
+        for ii in range(len(MACD_list)):
+            if((MACD_list[ii]<0) or (DIFF_list[ii]<0)):
+                laggingcounter += 1
+            else:
+                break
+        bondrange = (float(comdata_list[0][1])/float(comdata_list[laggingcounter][1])-1)*100
+        stockrange = (float(comdata_list[0][3])/float(comdata_list[laggingcounter][3])-1)*100
+        laggingrange = stockrange - bondrange 
+        lagging30counter, lagging30range = lagging_calc(comdata_list, 30)
+        lagging60counter, lagging60range = lagging_calc(comdata_list, 60)
+        lagging100counter, lagging100range = lagging_calc(comdata_list, 100)
+        lagging200counter, lagging200range = lagging_calc(comdata_list, 200)
+        lagging500counter, lagging500range = lagging_calc(comdata_list, 500)
+        maxlaggingcounter = 0
+        maxlaggingrange = 0
+        for ii in range(laggingcounter, min(100, len(comdata_list)-1)):
+            templaggingcounter = 0
+            templaggingrange = 0
+            for jj in range(ii, min(200, len(comdata_list)-1)):
+                if((MACD_list[jj]<0) or (DIFF_list[jj]<0)):
+                    templaggingcounter += 1
+                else:
+                    break
+                templaggingrange = (float(comdata_list[ii][3])/float(comdata_list[ii+templaggingcounter][3])-1)*100-(float(comdata_list[ii][1])/float(comdata_list[ii+templaggingcounter][1])-1)*100
+                if(maxlaggingrange<templaggingrange):
+                    maxlaggingrange=templaggingrange
+                if(maxlaggingcounter<templaggingcounter):
+                    maxlaggingcounter=templaggingcounter
+        if((laggingcounter>maxlaggingcounter/2) and (laggingrange>maxlaggingrange*2/3)):
+            bondlagging_result = [bondinfo, comdata_list[0][2], bondrange, stockrange, laggingrange, laggingcounter, maxlaggingrange, maxlaggingcounter, lagging30range, lagging30counter, lagging60range, lagging60counter, lagging100range, lagging100counter, lagging200range, lagging200counter, lagging500range, lagging500counter]
+    return bondlagging_result, stocklagging_result
+    
+
+
 def clear_data():
     for filename in os.listdir(bonddata_path):
         filepath = os.path.join(bonddata_path, filename)
@@ -1057,4 +1222,5 @@ def main():
 
 
 if __name__ =="__main__":
-    main()
+#    main()
+    lagging_Model_Select()
