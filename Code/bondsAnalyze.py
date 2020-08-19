@@ -1194,6 +1194,11 @@ def analyze_bonddata():
 #    RSRS_Model_Select()
     RSRS_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tRSRS_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tRSRS_Model_Select Begin!")
+#    lagging_Model_Select()
+    lagging_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tRSRS_Model_Select Finished!")
+
 
 
 def main():
@@ -1222,5 +1227,4 @@ def main():
 
 
 if __name__ =="__main__":
-#    main()
-    lagging_Model_Select()
+    main()
