@@ -85,7 +85,7 @@ def clear_data():
     if(os.path.exists(tradefile_path)):
         os.remove(tradefile_path)
 
-    
+
 def trade_analyze():
     def point_Model_Trade_pipeline(tradeitem, stockdata_list):
         strvar = ""
@@ -176,13 +176,13 @@ def trade_analyze():
             DN_list[ii] = MA_list[ii]-STD_list[ii]*N2
             WIDTH_list[ii] = (UP_list[ii]-DN_list[ii])/MA_list[ii]
         if((closingprice_list[1]<DN_list[1]) or (closingprice_list[0]<DN_list[0])):
-            strvar = "\t BOLL超跌买入信号 买入价格: " + str(round(DN_list[0],2)) + "\n"
+            strvar = "\tBOLL超跌买入信号 买入价格: " + str(round(DN_list[0],2)) + "\n"
         elif((closingprice_list[1]>UP_list[1]) or (closingprice_list[0]>UP_list[0])):
-            strvar = "\t BOLL超涨卖出信号 卖出价格: " + str(round(UP_list[0],2)) + "\n"
+            strvar = "\tBOLL超涨卖出信号 卖出价格: " + str(round(UP_list[0],2)) + "\n"
         elif((closingprice_list[1]<MA_list[1]) and (closingprice_list[0]>MA_list[0])):
-            strvar = "\t BOLL均线买入信号 买入价格: " + str(round(MA_list[0],2)) + "\n"
+            strvar = "\tBOLL均线买入信号 买入价格: " + str(round(MA_list[0],2)) + "\n"
         elif((closingprice_list[1]>MA_list[1]) and (closingprice_list[0]<MA_list[0])):
-            strvar = "\t BOLL均线卖出信号 卖出价格: " + str(round(MA_list[0],2)) + "\n"
+            strvar = "\tBOLL均线卖出信号 卖出价格: " + str(round(MA_list[0],2)) + "\n"
         return strvar
 
 
