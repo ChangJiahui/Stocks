@@ -28,10 +28,10 @@ end_time = time.strftime('%Y%m%d',time.localtime(time.time()))
 #end_time = "20190621"
 
 root_path = "D:\\Workspace\\Python\\Stocks"
+stockinfo_file = os.path.join(root_path, "Data", "stockinfo.txt")
 stockdata_path = os.path.join(root_path, "Data", "stock_data")
 EHBFfile_path = os.path.join(root_path, "Result", "Stocks", "EHBF_Analyze_Result.csv")
-resultdata_path = os.path.join(root_path, "Result", "Stocks")
-toolsdata_path = os.path.join(root_path, "Result", "Tools")
+resultdata_path = os.path.join(root_path, "Result", "Tools")
 blockdata_path = os.path.join(root_path, "Data", "block_data")
 holderdata_path = os.path.join(root_path, "Data", "holders_data")
 gdzjcdata_path = os.path.join(root_path, "Data", "gdzjc_data")
@@ -109,6 +109,7 @@ def get_htmltext(url):
 #            response = requests.get(url, headers=headers)
 #            print("Get Successfully: " + url)
             if(response.status_code!=200):
+#                time.sleep(60)
                 continue
             try:
                 html_text = response.content.decode('utf-8-sig')
@@ -128,10 +129,13 @@ def download_file(url, filename):
     for ii in range(10):
         time.sleep(random.choice([1,2]))
         try:
-            data = requests.get(url)
+            response = requests.get(url)
+            if(response.status_code!=200):
+#                time.sleep(60)
+                continue
             with open(filename, 'wb') as fp:
                 chunk_size = 100000
-                for chunk in data.iter_content(chunk_size):
+                for chunk in response.iter_content(chunk_size):
                     fp.write(chunk)
 #            print("Download Successfully: " + url)
             return True
@@ -149,8 +153,8 @@ def get_jsvar(url, varname):
 
 
 def holders_Model_Select():
-    resultfile_path = os.path.join(toolsdata_path, "Holders_Analyze_Select.csv")
-    title = ["股票名称", "当前股东人数", "当季股东人数降幅",  "股东人数降低季度", "股东人数总降幅", "历史位置", "盈利比例", "历史最大股东人数", "历史最大股东人数日期", "历史最小股东人数", "历史最小股东人数日期"]
+    resultfile_path = os.path.join(resultdata_path, "Holders_Analyze_Select.csv")
+    title = ["股票名称", "当前股东人数", "当季股东人数降幅",  "股东人数降低季度", "股东人数总降幅", "历史位置", "百日位置", "盈利比例", "历史最大股东人数", "历史最大股东人数日期", "历史最小股东人数", "历史最小股东人数日期"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         stockinfo = filename.split('.')[0]
@@ -181,12 +185,14 @@ def holders_Model_Select():
                         maxholderdate = holders_list[holdernum_list.index(maxholdernum)][2]
                         _, EHBFdata_list = read_csvfile(EHBFfile_path)
                         earnratio = "-1"
-                        reboundrange = "-1"
+                        reboundrange1 = "-1"
+                        reboundrange2 = "-1"
                         for EHBFitem in EHBFdata_list:
                             if(EHBFitem[0]==stockinfo):
-                                reboundrange = EHBFitem[2]
-                                earnratio = EHBFitem[4]
-                        resultdata_list.append([stockinfo, holdernum_list[0], holderrange, modelcounter, modelrange, reboundrange, earnratio, maxholdernum, maxholderdate, minholdernum, minholderdate])
+                                reboundrange1 = EHBFitem[5]
+                                reboundrange2 = EHBFitem[6]
+                                earnratio = EHBFitem[9]
+                        resultdata_list.append([stockinfo, holdernum_list[0], holderrange, modelcounter, modelrange, reboundrange1, reboundrange2, earnratio, maxholdernum, maxholderdate, minholdernum, minholderdate])
                 break
             except Exception as e:
                 print(e)
@@ -196,8 +202,8 @@ def holders_Model_Select():
 
 def gdzjc_Model_Select():
 # 东方财富网增减持数据
-    resultfile_path = os.path.join(toolsdata_path, "gdzjc_Model_Select_Result.csv")
-    title = ["股票名称", "最新价", "涨跌幅(%)", "股东名称", "增减", "方式", "变动开始日", "变动截止日", "公告日", "变动数量(万股)", "占总股本比例(%)", "占流通股比例(%)",  "持股总数(万股)", "占总股本比例", "持流通股数(万股)", "占流通股比例"]
+    resultfile_path = os.path.join(resultdata_path, "gdzjc_Model_Select_Result.csv")
+    title = ["股票名称", "最新价", "涨跌幅(%)", "股东名称", "增减", "方式", "变动开始日", "变动截止日", "公告日", "变动数量(万股)", "占总股本比例(%)", "占流通股比例(%)",  "持股总数(万股)", "占总股本比例", "持流通股数(万股)", "占流通股比例", "历史位置", "百日位置", "盈利比例"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         stockinfo = filename.split('.')[0]
@@ -212,15 +218,24 @@ def gdzjc_Model_Select():
                     stockzjcitem = stockzjc.split(',')
                     zjcdata_list.append([stockinfo]+stockzjcitem[2:6]+[stockzjcitem[8]]+stockzjcitem[13:16]+[stockzjcitem[6], stockzjcitem[16], stockzjcitem[7]]+stockzjcitem[9:13])
                 write_csvfile(os.path.join(gdzjcdata_path, stockinfo+".csv"), zjc_title, zjcdata_list)
-                if((zjcdata_list[0][4]=="增持") and (zjcdata_list[0][8]>time.strftime('%Y-%m-%d',time.localtime(time.time()-24*3600*366)))):
-                    resultdata_list.append(zjcdata_list[0])
+                if((zjcdata_list[0][4]=="增持") and (zjcdata_list[0][8]>time.strftime('%Y-%m-%d',time.localtime(time.time()-366*24*3600)))):
+                    _, EHBFdata_list = read_csvfile(EHBFfile_path)
+                    earnratio = "-1"
+                    reboundrange1 = "-1"
+                    reboundrange2 = "-1"
+                    for EHBFitem in EHBFdata_list:
+                        if(EHBFitem[0]==stockinfo):
+                            reboundrange1 = EHBFitem[5]
+                            reboundrange2 = EHBFitem[6]
+                            earnratio = EHBFitem[9]
+                    resultdata_list.append(zjcdata_list[0]+[reboundrange1, reboundrange2, earnratio])
     write_csvfile(resultfile_path, title, resultdata_list)
 
 
 def repurchase_Model_Select():
 # 股票回购信息汇总
-    resultfile_path = os.path.join(toolsdata_path, "repurchase_Model_Select_Result.csv")
-    title = ["股票代码", "公告日期", "截止日期", "进度", "过期日期", "回购数量", "回购金额", "回购最高价", "回购最低价"]
+    resultfile_path = os.path.join(resultdata_path, "repurchase_Model_Select_Result.csv")
+    title = ["股票代码", "公告日期", "截止日期", "进度", "过期日期", "回购数量", "回购金额", "回购最高价", "回购最低价", "历史位置", "百日位置", "盈利比例"]
     resultdata_list = []
     for ii in range(3):
         try:
@@ -228,7 +243,18 @@ def repurchase_Model_Select():
             repurchase_df = tspro.repurchase(start_date=time.strftime('%Y%m%d',time.localtime(time.time()-24*3600*366)), end_date=end_time)
             for item in repurchase_df.values:
                 if(item[0][0] in ["0", "6"]):
-                    resultdata_list.append(list(item))
+                    _, EHBFdata_list = read_csvfile(EHBFfile_path)
+                    earnratio = "None"
+                    reboundrange1 = "None"
+                    reboundrange2 = "None"
+                    stockinfo = item[0][:-3]
+                    for EHBFitem in EHBFdata_list:
+                        if(EHBFitem[0].split('_')[-1][-6:]==stockinfo):
+                            stockinfo = EHBFitem[0]
+                            reboundrange1 = EHBFitem[5]
+                            reboundrange2 = EHBFitem[6]
+                            earnratio = EHBFitem[9]
+                    resultdata_list.append([stockinfo]+list(item)[1:]+[reboundrange1, reboundrange2, earnratio])
             break
         except Exception as e:
             print(e)
@@ -238,8 +264,8 @@ def repurchase_Model_Select():
 
 def block_Model_Select():
 # 大宗交易数据
-    resultfile_path = os.path.join(toolsdata_path, "block_Model_Select_Result.csv")
-    title = ["股票名称", "交易日期", "交易溢价率", "交易后最大涨幅", "交易后最大跌幅", "交易换手率", "交易/当日量比", "交易/今日量比", "成交金额", "买方营业部", "卖方营业部"]
+    resultfile_path = os.path.join(resultdata_path, "block_Model_Select_Result.csv")
+    title = ["股票名称", "交易日期", "交易溢价率", "交易后最大涨幅", "交易后最大跌幅", "交易换手率", "交易/当日量比", "交易/今日量比", "成交金额", "买方营业部", "卖方营业部", "历史位置", "百日位置", "盈利比例"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         stockinfo = filename.split('.')[0]
@@ -256,7 +282,9 @@ def block_Model_Select():
                 print(e)
                 time.sleep(600)
         for ii in reversed(range(len(block_list))):
-            if(block_list[ii][5][:4]==block_list[ii][6][:4]):
+            if((block_list[ii][5] is None) or (block_list[ii][6] is None)):
+                block_list.pop(ii)
+            elif(block_list[ii][5][:4]==block_list[ii][6][:4]):
                 block_list.pop(ii)
             else:
                 block_list[ii][0] = stockinfo
@@ -275,7 +303,16 @@ def block_Model_Select():
             volumnratio2 = tradevolumn/float(stockdata_list[0][10])
             riserange = (max(closingprice_list)/closingprice_list[blockoffset]-1)*100
             failrange = (min(closingprice_list)/closingprice_list[blockoffset]-1)*100
-            resultdata_list.append([stockinfo, stockdata_list[blockoffset][0], convpre, riserange, failrange, tradevolumn, volumnratio1, volumnratio2, block_list[ii][4], block_list[ii][5], block_list[ii][6]])
+            _, EHBFdata_list = read_csvfile(EHBFfile_path)
+            earnratio = "-1"
+            reboundrange1 = "-1"
+            reboundrange2 = "-1"
+            for EHBFitem in EHBFdata_list:
+                if(EHBFitem[0]==stockinfo):
+                    reboundrange1 = EHBFitem[5]
+                    reboundrange2 = EHBFitem[6]
+                    earnratio = EHBFitem[9]
+            resultdata_list.append([stockinfo, stockdata_list[blockoffset][0], convpre, riserange, failrange, tradevolumn, volumnratio1, volumnratio2, block_list[ii][4], block_list[ii][5], block_list[ii][6], reboundrange1, reboundrange2, earnratio])
     write_csvfile(resultfile_path, title, resultdata_list)
 
 
@@ -339,37 +376,35 @@ def similar_Model_Select_pipeline(filename):
 
 
 def clear_data():
-    if(not os.path.exists(toolsdata_path)):
-        os.mkdir(toolsdata_path)
-    for filename in os.listdir(toolsdata_path):
-        filepath = os.path.join(toolsdata_path, filename)
+    if(not os.path.exists(resultdata_path)):
+        os.mkdir(resultdata_path)
+    for filename in os.listdir(resultdata_path):
+        filepath = os.path.join(resultdata_path, filename)
         if(os.path.exists(filepath)):
             os.remove(filepath)
     if(not os.path.exists(blockdata_path)):
         os.mkdir(blockdata_path)
     for filename in os.listdir(blockdata_path):
         filepath = os.path.join(blockdata_path, filename)
-        if(os.path.exists(blockdata_path)):
-            os.remove(blockdata_path)
+        if(os.path.exists(filepath)):
+            os.remove(filepath)
     if(not os.path.exists(holderdata_path)):
         os.mkdir(holderdata_path)
     for filename in os.listdir(holderdata_path):
         filepath = os.path.join(holderdata_path, filename)
-        if(os.path.exists(holderdata_path)):
-            os.remove(holderdata_path)
+        if(os.path.exists(filepath)):
+            os.remove(filepath)
     if(not os.path.exists(gdzjcdata_path)):
         os.mkdir(gdzjcdata_path)
     for filename in os.listdir(gdzjcdata_path):
         filepath = os.path.join(gdzjcdata_path, filename)
-        if(os.path.exists(gdzjcdata_path)):
-            os.remove(gdzjcdata_path)
+        if(os.path.exists(filepath)):
+            os.remove(filepath)
 
 
 def summary_result():
-    for filename in os.listdir(stockdata_path):
-        shutil.copy(os.path.join(stockdata_path, filename), os.path.join(toolsdata_path, filename))
-    selectfile_list = os.listdir(toolsdata_path)
-    resultfile_path = os.path.join(toolsdata_path, "summary_result.csv")
+    selectfile_list = os.listdir(resultdata_path)
+    resultfile_path = os.path.join(resultdata_path, "summary_result.csv")
     title = ["股票名称", "总和"] + [item.split('_')[0] for item in selectfile_list]
     stockinfo_list = []
     with open(stockinfo_file, 'r') as fp:
@@ -380,9 +415,9 @@ def summary_result():
     write_csvfile(resultfile_path, title, resultdata_list)
 def summary_result_par():
     for filename in os.listdir(stockdata_path):
-        shutil.copy(os.path.join(stockdata_path, filename), os.path.join(toolsdata_path, filename))
-    selectfile_list = os.listdir(toolsdata_path)
-    resultfile_path = os.path.join(toolsdata_path, "summary_result.csv")
+        shutil.copy(os.path.join(stockdata_path, filename), os.path.join(resultdata_path, filename))
+    selectfile_list = os.listdir(resultdata_path)
+    resultfile_path = os.path.join(resultdata_path, "summary_result.csv")
     title = ["股票名称", "总和"] + [item.split('_')[0] for item in selectfile_list]
     stockinfo_list = []
     with open(stockinfo_file, 'r') as fp:
@@ -393,13 +428,13 @@ def summary_result_par():
     pool.join()
     write_csvfile(resultfile_path, title, resultdata_list)
 def summary_result_pipeline(stockinfo):
-    selectfile_list = os.listdir(toolsdata_path)
+    selectfile_list = os.listdir(resultdata_path)
     for ii in reversed(range(len(selectfile_list))):
-        if(not os.path.exists(os.path.join(toolsdata_path, selectfile_list[ii]))):
+        if(not os.path.exists(os.path.join(resultdata_path, selectfile_list[ii]))):
             selectfile_list.pop(ii)
     summary_list = []
     for ii in range(len(selectfile_list)):
-        _, selectdata_list = read_csvfile(os.path.join(toolsdata_path, selectfile_list[ii]))
+        _, selectdata_list = read_csvfile(os.path.join(resultdata_path, selectfile_list[ii]))
         stockinfo_list = [item[0] for item in selectdata_list]
         if(stockinfo in stockinfo_list):
             summary_list.append(1)
@@ -424,10 +459,10 @@ def analyze_stockdata():
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tholders_Model_Select Begin!")
     holders_Model_Select()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tholders_Model_Select Finished!")
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tsimilar_Model_Select Begin!")
-##    similar_Model_Select()
-    similar_Model_Select_par()
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tsimilar_Model_Select Finished!")
+#    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tsimilar_Model_Select Begin!")
+#    similar_Model_Select()
+#    similar_Model_Select_par()
+#    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tsimilar_Model_Select Finished!")
 
 
 def main():
@@ -441,8 +476,8 @@ def main():
     analyze_stockdata()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tData Analyze Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tResult Summary Begin!")
-#    summary_result()
-    summary_result_par()
+    summary_result()
+#    summary_result_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tResult Summary Finished!")
 
 
