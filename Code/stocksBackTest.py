@@ -38,49 +38,43 @@ def get_htmltext(url):
     for ii in range(10):
         time.sleep(random.choice([1,2]))
         try:
-#            response = requests.get(url, headers=headers)
             response = requests.get(url)
+#            response = requests.get(url, headers=headers)
 #            print("Get Successfully: " + url)
             if(response.status_code!=200):
-                return ""
-            break
+#                time.sleep(60)
+                continue
+            try:
+                html_text = response.content.decode('utf-8-sig')
+            except UnicodeDecodeError as e:
+                html_text = response.content.decode('gbk')
+#                print(e)
+#            except NameError as e:
+#                print(e)
+#                html_text = ""
+            return html_text
         except Exception as e:
             print(e)
-            continue
-#    print(response.text)
-    try:
-        html_text = response.content.decode('utf-8-sig')
-    except UnicodeDecodeError as e:
-#        print(e)
-        html_text = response.content.decode('gbk')
-#    except NameError as e:
-#        print(e)
-#        html_text = ""
-    except Exception as e:
-        print(e)
-        html_text = ""
-    return html_text
+    return ""
 
 
 def download_file(url, filename):
     for ii in range(10):
         time.sleep(random.choice([1,2]))
         try:
-            data = requests.get(url)
-            break
+            response = requests.get(url)
+            if(response.status_code!=200):
+#                time.sleep(60)
+                continue
+            with open(filename, 'wb') as fp:
+                chunk_size = 100000
+                for chunk in response.iter_content(chunk_size):
+                    fp.write(chunk)
+#            print("Download Successfully: " + url)
+            return True
         except Exception as e:
             print(e)
-            continue
-    try:
-        with open(filename, 'wb') as fp:
-            chunk_size = 100000
-            for chunk in data.iter_content(chunk_size):
-                fp.write(chunk)
-#        print("Download Successfully: " + url)
-        return True
-    except Exception as e:
-        print(e)
-        return False
+    return False
 
 
 def detect_163data(url):
