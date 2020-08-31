@@ -82,7 +82,6 @@ def get_TSbonddata(bondTScode, start_time, end_time, bonddata_file):
             check_bonddata(bonddata_file)
             break
         except Exception as e:
-            print(bondTScode)
             print(e)
             time.sleep(600)
 
@@ -1155,33 +1154,33 @@ def summary_result_pipeline(bondinfo):
 
 def analyze_bonddata():
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tEHBF_Analyze Begin!")
-#    EHBF_Analyze()
-    EHBF_Analyze_par()
+    EHBF_Analyze()
+#    EHBF_Analyze_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tEHBF_Analyze Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\twave_Model_Select Begin!")
-#    wave_Model_Select()
-    wave_Model_Select_par()
+    wave_Model_Select()
+#    wave_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\twave_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMACDDIFF_Model_Select Begin!")
-#    MACDDIFF_Model_Select()
-    MACDDIFF_Model_Select_par()
+    MACDDIFF_Model_Select()
+#    MACDDIFF_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMACDDIFF_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tKDJ_Model_Select Begin!")
-#    KDJ_Model_Select()
-    KDJ_Model_Select_par()
+    KDJ_Model_Select()
+#    KDJ_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tKDJ_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tBOLL_Model_Select Begin!")
-#    BOLL_Model_Select()
-    BOLL_Model_Select_par()
+    BOLL_Model_Select()
+#    BOLL_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tBOLL_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tRSRS_Model_Select Begin!")
-#    RSRS_Model_Select()
-    RSRS_Model_Select_par()
+    RSRS_Model_Select()
+#    RSRS_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tRSRS_Model_Select Finished!")
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tRSRS_Model_Select Begin!")
-#    lagging_Model_Select()
-    lagging_Model_Select_par()
-    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tRSRS_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tlagging_Model_Select Begin!")
+    lagging_Model_Select()
+#    lagging_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tlagging_Model_Select Finished!")
 
 
 
@@ -1205,8 +1204,8 @@ def main():
         analyze_bonddata()
         print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tData Analyze Finished!")
         print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tResult Summary Begin!")
-#        summary_result()
-        summary_result_par()
+        summary_result()
+#        summary_result_par()
         print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tResult Summary Finished!")
 
 
