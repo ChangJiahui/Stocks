@@ -69,19 +69,23 @@ def write_csvfile(filename, title, data_list):
 
 
 def get_htmltext(url):
+#    headers = {
+#            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.81 Safari/537.36'
+#    }
     for ii in range(10):
         time.sleep(random.choice([1,2]))
         try:
-            response = requests.get(url, headers=headers)
-#            response = requests.get(url)
+            response = requests.get(url)
+#            response = requests.get(url, headers=headers)
 #            print("Get Successfully: " + url)
             if(response.status_code!=200):
-                return ""
+#                time.sleep(60)
+                continue
             try:
                 html_text = response.content.decode('utf-8-sig')
             except UnicodeDecodeError as e:
-#                print(e)
                 html_text = response.content.decode('gbk')
+#                print(e)
 #            except NameError as e:
 #                print(e)
 #                html_text = ""
@@ -1033,28 +1037,28 @@ def summary_result_pipeline(fundinfo):
 
 def analyze_funddata():
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tEHBF_Analyze Begin!")
-#    EHBF_Analyze()
-    EHBF_Analyze_par()
+    EHBF_Analyze()
+#    EHBF_Analyze_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tEHBF_Analyze Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\twave_Model_Select Begin!")
-#    wave_Model_Select()
-    wave_Model_Select_par()
+    wave_Model_Select()
+#    wave_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\twave_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMACDDIFF_Model_Select Begin!")
-#    MACDDIFF_Model_Select()
-    MACDDIFF_Model_Select_par()
+    MACDDIFF_Model_Select()
+#    MACDDIFF_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tMACDDIFF_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tKDJ_Model_Select Begin!")
-#    KDJ_Model_Select()
-    KDJ_Model_Select_par()
+    KDJ_Model_Select()
+#    KDJ_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tKDJ_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tBOLL_Model_Select Begin!")
-#    BOLL_Model_Select()
-    BOLL_Model_Select_par()
+    BOLL_Model_Select()
+#    BOLL_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tBOLL_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tRSRS_Model_Select Begin!")
-#    RSRS_Model_Select()
-    RSRS_Model_Select_par()
+    RSRS_Model_Select()
+#    RSRS_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tRSRS_Model_Select Finished!")
 
 
@@ -1078,8 +1082,8 @@ def main():
         analyze_funddata()
         print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tData Analyze Finished!")
         print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tResult Summary Begin!")
-#        summary_result()
-        summary_result_par()
+        summary_result()
+#        summary_result_par()
         print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tResult Summary Finished!")
 
 
