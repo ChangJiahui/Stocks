@@ -215,48 +215,6 @@ def trade_analyze():
         return strvar
 
 
-    def RSRS_Model_Trade_pipeline(stockdata_list):
-        strvar = ""
-        N = 16
-        P1 = 0.1
-        P2 = 0.9
-        closingprice = float(stockdata_list[0][3])
-        perioddaynum = min(10, len(stockdata_list)-N)
-        if(perioddaynum<100):
-            return strvar
-        closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N]]
-        upperprice_list = [float(item[4]) for item in stockdata_list[:perioddaynum+N]]
-        lowerprice_list = [float(item[5]) for item in stockdata_list[:perioddaynum+N]]
-        beta_list = [0]*perioddaynum
-        betadist_list = [0]*perioddaynum
-        rsquared_list = [0]*perioddaynum
-        zscore_list = [0]*perioddaynum
-        zscoredist_list = [0]*perioddaynum
-        for ii in reversed(range(perioddaynum)):
-            model = sm.OLS(upperprice_list[ii:ii+N], sm.add_constant(lowerprice_list[ii:ii+N]))
-            modelfit = model.fit()
-            beta = modelfit.params[1]
-            r2 = modelfit.rsquared
-            beta_list[ii] = beta
-            rsquared_list[ii] = r2
-            zscore_list[ii] = beta*r2
-        betasort_list = sorted(beta_list)
-        for ii in range(perioddaynum):
-            betadist_list[ii] = betasort_list.index(beta_list[ii])/perioddaynum
-        zscoresort_list = sorted(zscore_list)
-        for ii in range(perioddaynum):
-            zscoredist_list[ii] = zscoresort_list.index(zscore_list[ii])/perioddaynum
-        if((zscoredist_list[0]<P2) and (zscoredist_list[0]>P2)):
-            strvar = "\tRSRS突破买入信号 买入价格: " + str(stockdata_list[0][3]) + "\n"
-        elif((zscoredist_list[0]>P2) and (zscoredist_list[0]<P2)):
-            strvar = "\tRSRS回归卖出信号 卖出价格: " + str(stockdata_list[0][3]) + "\n"
-        elif((zscoredist_list[0]>P1) and (zscoredist_list[0]<P2)):
-            strvar = "\tRSRS突破卖出信号 卖出价格: " + str(stockdata_list[0][3]) + "\n"
-        elif((zscoredist_list[0]<P1) and (zscoredist_list[0]>P2)):
-            strvar = "\tRSRS回归买入信号 买入价格: " + str(stockdata_list[0][3]) + "\n"
-        return strvar
-
-
     def trend1T5_Model_Select_pipeline(stockdata_list):
         strvar = ""
         N1 = 1
@@ -703,7 +661,6 @@ def trade_analyze():
                               + drop_Model_Trade_pipeline(indexdata_list) \
                               + BOLL_Model_Trade_pipeline(indexdata_list) \
                               + parting_Model_Trade_pipeline(indexdata_list) \
-                              + RSRS_Model_Trade_pipeline(indexdata_list) \
                               + gap_Model_Trade_pipeline(indexdata_list) \
                               + MACD_Model_Trade_pipeline(indexdata_list) \
                               + KDJ_Model_Trade_pipeline(indexdata_list) \
@@ -731,7 +688,6 @@ def trade_analyze():
                                   + drop_Model_Trade_pipeline(stockdata_list) \
                                   + BOLL_Model_Trade_pipeline(stockdata_list) \
                                   + parting_Model_Trade_pipeline(stockdata_list) \
-                                  + RSRS_Model_Trade_pipeline(stockdata_list) \
                                   + gap_Model_Trade_pipeline(stockdata_list) \
                                   + MACD_Model_Trade_pipeline(stockdata_list) \
                                   + KDJ_Model_Trade_pipeline(stockdata_list) \
