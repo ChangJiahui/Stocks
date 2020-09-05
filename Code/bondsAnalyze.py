@@ -407,8 +407,7 @@ def RSRS_Model_Select_par():
     write_csvfile(resultfile_path, title, resultdata_list)
 def RSRS_Model_Select_pipeline(filename):
     N = 16
-    P1 = 0.1
-    P2 = 0.9
+    rounddaynum = 10
     _, bonddata_list = read_csvfile(os.path.join(bonddata_path, filename))
     bondinfo = filename[:filename.rfind(".")]
     closingprice = float(bonddata_list[0][6])
@@ -423,18 +422,18 @@ def RSRS_Model_Select_pipeline(filename):
     rsquared_list = [0]*perioddaynum
     zscore_list = [0]*perioddaynum
     zscoredist_list = [0]*perioddaynum
-    for ii in reversed(range(perioddaynum)):
+    offset_list = []
+    for ii in range(perioddaynum):
         model = sm.OLS(upperprice_list[ii:ii+N], sm.add_constant(lowerprice_list[ii:ii+N]))
         modelfit = model.fit()
         if(len(modelfit.params)==2):
             beta = modelfit.params[1]
             r2 = modelfit.rsquared
-        else:
-            beta = 0
-            r2 = 0
-        beta_list[ii] = beta
-        rsquared_list[ii] = r2
-        zscore_list[ii] = beta*r2
+            beta_list[ii] = beta
+            rsquared_list[ii] = r2
+            zscore_list[ii] = beta*r2
+            if(r2>0.9):
+                offset_list.append(ii)
     betasort_list = sorted(beta_list)
     for ii in range(perioddaynum):
         betadist_list[ii] = betasort_list.index(beta_list[ii])/perioddaynum
@@ -446,18 +445,18 @@ def RSRS_Model_Select_pipeline(filename):
     maxprice_list = []
     maxoffset_list = []
     isDrop = True
-    for ii in reversed(range(1, perioddaynum)):
+    for ii in reversed(range(len(offset_list))):
         if(isDrop):
-            if(zscoredist_list[ii-1]>P2):
-                minprice_list.insert(0, closingprice_list[ii])
-                minoffset_list.insert(0, ii)
+            if(beta_list[offset_list[ii]]==max([beta_list[kk] for kk in offset_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)]])):
+                maxprice_list.insert(0, closingprice_list[offset_list[ii]])
+                maxoffset_list.insert(0, offset_list[ii])
                 isDrop=False
         else:
-            if(zscoredist_list[ii-1]<P1):
-                maxprice_list.insert(0, closingprice_list[ii])
-                maxoffset_list.insert(0, ii)
+            if(beta_list[offset_list[ii]]==min([beta_list[kk] for kk in offset_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)]])):
+                minprice_list.insert(0, closingprice_list[offset_list[ii]])
+                minoffset_list.insert(0, offset_list[ii])
                 isDrop=True
-    if((len(minprice_list)>3) and (len(maxprice_list)>3) and (not isDrop) and (minoffset_list[0]<maxoffset_list[0]) and (zscoredist_list[0]>P2)):
+    if((len(minprice_list)>3) and (len(maxprice_list)>3) and (isDrop)):
         reboundcounter = minoffset_list[0]
         reboundrange = (closingprice/minprice_list[0]-1)*100
         failcounter = maxoffset_list[0]-minoffset_list[0]
@@ -466,7 +465,7 @@ def RSRS_Model_Select_pipeline(filename):
         lastreboundrange = (maxprice_list[0]/minprice_list[1]-1)*100
         lastfailcounter = maxoffset_list[1]-minoffset_list[1]
         lastfailrange = (minprice_list[1]/maxprice_list[1]-1)*100
-        if(reboundrange<20):
+        if((reboundrange<20) and (beta_list[minoffset_list[0]]<beta_list[minoffset_list[1]])):
             return [bondinfo, bonddata_list[0][8], zscore_list[0], betadist_list[0], rsquared_list[0], reboundrange, reboundcounter, failrange, failcounter, lastreboundrange, lastreboundcounter, lastfailrange, lastfailcounter]
     return []
 
