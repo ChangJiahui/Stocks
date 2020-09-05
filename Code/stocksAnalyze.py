@@ -873,8 +873,6 @@ def RSRS_Model_Select_par():
     write_csvfile(resultfile_path, title, resultdata_list)
 def RSRS_Model_Select_pipeline(filename):
     N = 16
-    P1 = 0.1
-    P2 = 0.9
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     closingprice = float(stockdata_list[0][3])
@@ -889,18 +887,18 @@ def RSRS_Model_Select_pipeline(filename):
     rsquared_list = [0]*perioddaynum
     zscore_list = [0]*perioddaynum
     zscoredist_list = [0]*perioddaynum
-    for ii in reversed(range(perioddaynum)):
+    offset_list = []
+    for ii in range(perioddaynum):
         model = sm.OLS(upperprice_list[ii:ii+N], sm.add_constant(lowerprice_list[ii:ii+N]))
         modelfit = model.fit()
         if(len(modelfit.params)==2):
             beta = modelfit.params[1]
             r2 = modelfit.rsquared
-        else:
-            beta = 0
-            r2 = 0
-        beta_list[ii] = beta
-        rsquared_list[ii] = r2
-        zscore_list[ii] = beta*r2
+            beta_list[ii] = beta
+            rsquared_list[ii] = r2
+            zscore_list[ii] = beta*r2
+            if(r2>0.9):
+                offset_list.append(ii)
     betasort_list = sorted(beta_list)
     for ii in range(perioddaynum):
         betadist_list[ii] = betasort_list.index(beta_list[ii])/perioddaynum
@@ -912,18 +910,18 @@ def RSRS_Model_Select_pipeline(filename):
     maxprice_list = []
     maxoffset_list = []
     isDrop = True
-    for ii in reversed(range(1, perioddaynum)):
+    for ii in reversed(range(len(offset_list))):
         if(isDrop):
-            if(zscoredist_list[ii-1]>P2):
-                minprice_list.insert(0, closingprice_list[ii])
-                minoffset_list.insert(0, ii)
+            if(beta_list[offset_list[ii]]==max([beta_list[kk] for kk in offset_list[max(ii-20,0):min(ii+20,perioddaynum-1)]])):
+                maxprice_list.insert(0, closingprice_list[offset_list[ii]])
+                maxoffset_list.insert(0, offset_list[ii])
                 isDrop=False
         else:
-            if(zscoredist_list[ii-1]<P1):
-                maxprice_list.insert(0, closingprice_list[ii])
-                maxoffset_list.insert(0, ii)
+            if(beta_list[offset_list[ii]]==min([beta_list[kk] for kk in offset_list[max(ii-20,0):min(ii+20,perioddaynum-1)]])):
+                minprice_list.insert(0, closingprice_list[offset_list[ii]])
+                minoffset_list.insert(0, offset_list[ii])
                 isDrop=True
-    if((len(minprice_list)>3) and (len(maxprice_list)>3) and (not isDrop) and (minoffset_list[0]<maxoffset_list[0]) and (zscoredist_list[0]>P2)):
+    if((len(minprice_list)>3) and (len(maxprice_list)>3) and (isDrop)):
         reboundcounter = minoffset_list[0]
         reboundrange = (closingprice/minprice_list[0]-1)*100
         failcounter = maxoffset_list[0]-minoffset_list[0]
@@ -932,7 +930,7 @@ def RSRS_Model_Select_pipeline(filename):
         lastreboundrange = (maxprice_list[0]/minprice_list[1]-1)*100
         lastfailcounter = maxoffset_list[1]-minoffset_list[1]
         lastfailrange = (minprice_list[1]/maxprice_list[1]-1)*100
-        if(reboundrange<20):
+        if((reboundrange<20) and (beta_list[minoffset_list[0]]<beta_list[minoffset_list[1]])):
             return [stockinfo, stockdata_list[0][9], zscore_list[0], betadist_list[0], rsquared_list[0], reboundrange, reboundcounter, failrange, failcounter, lastreboundrange, lastreboundcounter, lastfailrange, lastfailcounter]
     return []
 
@@ -1024,8 +1022,7 @@ def obvper_Model_Select_par():
     write_csvfile(resultfile_path, title, resultdata_list)
 def obvper_Model_Select_pipeline(filename):
     N = 10
-    P1 = 0.2
-    P2 = 0.8
+    rounddaynum = 10
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     closingprice = float(stockdata_list[0][3])
@@ -1046,18 +1043,18 @@ def obvper_Model_Select_pipeline(filename):
     maxprice_list = []
     maxoffset_list = []
     isDrop = True
-    for ii in reversed(range(1, perioddaynum)):
+    for ii in reversed(range(perioddaynum)):
         if(isDrop):
-            if(obvdist_list[ii-1]>P2):
-                minprice_list.insert(0, closingprice_list[ii])
-                minoffset_list.insert(0, ii)
-                isDrop=False
-        else:
-            if(obvdist_list[ii-1]<P1):
+            if(obvdist_list[ii]==max(obvdist_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])):
                 maxprice_list.insert(0, closingprice_list[ii])
                 maxoffset_list.insert(0, ii)
+                isDrop=False
+        else:
+            if(obvdist_list[ii]==min(obvdist_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])):
+                minprice_list.insert(0, closingprice_list[ii])
+                minoffset_list.insert(0, ii)
                 isDrop=True
-    if((len(minprice_list)>3) and (len(maxprice_list)>3) and (obvdist_list[0]>P2)):
+    if((len(minprice_list)>3) and (len(maxprice_list)>3) and (isDrop)):
         reboundcounter = minoffset_list[0]
         reboundrange = (closingprice/minprice_list[0]-1)*100
         failcounter = maxoffset_list[0]-minoffset_list[0]
@@ -1066,7 +1063,7 @@ def obvper_Model_Select_pipeline(filename):
         lastreboundrange = (maxprice_list[0]/minprice_list[1]-1)*100
         lastfailcounter = maxoffset_list[1]-minoffset_list[1]
         lastfailrange = (minprice_list[1]/maxprice_list[1]-1)*100
-        if(reboundrange<20):
+        if((reboundrange<20) and (obvdist_list[minoffset_list[0]]<obvdist_list[minoffset_list[1]])):
             return [stockinfo, stockdata_list[0][9], obvdist_list[0], reboundrange, reboundcounter, failrange, failcounter, lastreboundrange, lastreboundcounter, lastfailrange, lastfailcounter]
     return []
 
@@ -1191,8 +1188,7 @@ def stdper_Model_Select_par():
     write_csvfile(resultfile_path, title, resultdata_list)
 def stdper_Model_Select_pipeline(filename):
     N = 10
-    P1 = 0.2
-    P2 = 0.8
+    rounddaynum = 10
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     closingprice = float(stockdata_list[0][3])
@@ -1212,18 +1208,18 @@ def stdper_Model_Select_pipeline(filename):
     maxprice_list = []
     maxoffset_list = []
     isDrop = True
-    for ii in reversed(range(1, perioddaynum)):
+    for ii in reversed(range(perioddaynum)):
         if(isDrop):
-            if(stddist_list[ii-1]>P2):
-                minprice_list.insert(0, closingprice_list[ii])
-                minoffset_list.insert(0, ii)
-                isDrop=False
-        else:
-            if(stddist_list[ii-1]<P1):
+            if(stddist_list[ii]==max(stddist_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])):
                 maxprice_list.insert(0, closingprice_list[ii])
                 maxoffset_list.insert(0, ii)
+                isDrop=False
+        else:
+            if(stddist_list[ii]==min(stddist_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])):
+                minprice_list.insert(0, closingprice_list[ii])
+                minoffset_list.insert(0, ii)
                 isDrop=True
-    if((len(minprice_list)>3) and (len(maxprice_list)>3) and (stddist_list[0]>P2)):
+    if((len(minprice_list)>3) and (len(maxprice_list)>3) and (isDrop)):
         reboundcounter = minoffset_list[0]
         reboundrange = (closingprice/minprice_list[0]-1)*100
         failcounter = maxoffset_list[0]-minoffset_list[0]
@@ -1232,7 +1228,7 @@ def stdper_Model_Select_pipeline(filename):
         lastreboundrange = (maxprice_list[0]/minprice_list[1]-1)*100
         lastfailcounter = maxoffset_list[1]-minoffset_list[1]
         lastfailrange = (minprice_list[1]/maxprice_list[1]-1)*100
-        if(reboundrange<20):
+        if((reboundrange<20) and (stddist_list[minoffset_list[0]]<stddist_list[minoffset_list[1]])):
             return [stockinfo, stockdata_list[0][9], stddist_list[0], reboundrange, reboundcounter, failrange, failcounter, lastreboundrange, lastreboundcounter, lastfailrange, lastfailcounter]
     return []
 
@@ -1326,8 +1322,7 @@ def ampper_Model_Select_par():
     write_csvfile(resultfile_path, title, resultdata_list)
 def ampper_Model_Select_pipeline(filename):
     N = 10
-    P1 = 0.2
-    P2 = 0.8
+    rounddaynum = 10
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     closingprice = float(stockdata_list[0][3])
@@ -1349,18 +1344,18 @@ def ampper_Model_Select_pipeline(filename):
     maxprice_list = []
     maxoffset_list = []
     isDrop = True
-    for ii in reversed(range(1, perioddaynum)):
+    for ii in reversed(range(perioddaynum)):
         if(isDrop):
-            if(ampdist_list[ii-1]>P2):
-                minprice_list.insert(0, closingprice_list[ii])
-                minoffset_list.insert(0, ii)
-                isDrop=False
-        else:
-            if(ampdist_list[ii-1]<P1):
+            if(ampdist_list[ii]==max(ampdist_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])):
                 maxprice_list.insert(0, closingprice_list[ii])
                 maxoffset_list.insert(0, ii)
+                isDrop=False
+        else:
+            if(ampdist_list[ii]==min(ampdist_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])):
+                minprice_list.insert(0, closingprice_list[ii])
+                minoffset_list.insert(0, ii)
                 isDrop=True
-    if((len(minprice_list)>3) and (len(maxprice_list)>3) and (ampdist_list[0]>P2)):
+    if((len(minprice_list)>3) and (len(maxprice_list)>3) and (isDrop)):
         reboundcounter = minoffset_list[0]
         reboundrange = (closingprice/minprice_list[0]-1)*100
         failcounter = maxoffset_list[0]-minoffset_list[0]
@@ -1369,7 +1364,7 @@ def ampper_Model_Select_pipeline(filename):
         lastreboundrange = (maxprice_list[0]/minprice_list[1]-1)*100
         lastfailcounter = maxoffset_list[1]-minoffset_list[1]
         lastfailrange = (minprice_list[1]/maxprice_list[1]-1)*100
-        if(reboundrange<20):
+        if((reboundrange<20) and (ampdist_list[minoffset_list[0]]<ampdist_list[minoffset_list[1]])):
             return [stockinfo, stockdata_list[0][9], ampdist_list[0], reboundrange, reboundcounter, failrange, failcounter, lastreboundrange, lastreboundcounter, lastfailrange, lastfailcounter]
     return []
 
@@ -3351,7 +3346,7 @@ def shadowMonth_Model_Select_pipeline(filename):
     monthvolumn = monthvolumn_list[0]
     monthvolumn_list = monthvolumn_list[1:]
     periodmonthnum = min(36, len(monthclosingprice_list)-2)
-    if(periodmonthnum<5):
+    if((periodmonthnum<5) or (monthupperprice_list[0]==monthlowerprice_list[0])):
         return []
     shadowratio = (min(monthclosingprice_list[0], monthclosingprice_list[1])-monthlowerprice_list[0])/(monthupperprice_list[0]-monthlowerprice_list[0])
     upperrange = (monthupperprice_list[0]-max(monthclosingprice_list[0],monthclosingprice_list[1]))/monthclosingprice_list[1]*100
@@ -3369,6 +3364,8 @@ def shadowMonth_Model_Select_pipeline(filename):
         maxshadowratio = 0
         maxshadowratiodate = monthdate_list[0]
         for ii in range(2, periodmonthnum):
+            if(monthupperprice_list[ii]==monthlowerprice_list[ii]):
+                continue
             tempvolumnratio1 = monthvolumn_list[ii]/monthvolumn_list[ii+1]
             tempshadowrange = (min(monthclosingprice_list[ii], monthclosingprice_list[ii+1])-monthlowerprice_list[ii])/monthclosingprice_list[ii+1]*100
             tempshadowratio = (min(monthclosingprice_list[ii], monthclosingprice_list[ii+1])-monthlowerprice_list[ii])/(monthupperprice_list[ii]-monthlowerprice_list[ii])
