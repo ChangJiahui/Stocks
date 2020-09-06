@@ -422,14 +422,14 @@ def wave_Model_Select_pipeline(filename):
 def RSRS_Model_Select():
 # RSRS历史择时模型
     resultfile_path = os.path.join(resultdata_path, "RSRS_Model_Select_Result.csv")
-    title = ["场内基金名称", "当日涨跌幅", "RSRS因子", "beta分位", "rsquared", "最近多头幅度", "最近多头天数", "最近空头幅度", "最近空头天数", "上一多头幅度", "上一多头天数", "上一空头幅度", "上一空头天数"]
+    title = ["场内基金名称", "当日涨跌幅", "RSRS因子", "beta分位", "rsquared", "最近多头幅度", "最近多头天数", "最近空头幅度", "最近空头天数", "上一多头幅度", "上一多头天数", "上一空头幅度", "上一空头天数", "上二多头幅度", "上二多头天数", "上二空头幅度", "上二空头天数"]
     resultdata_list = []
     for filename in os.listdir(funddata_path):
         resultdata_list.append(RSRS_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
 def RSRS_Model_Select_par():
     resultfile_path = os.path.join(resultdata_path, "RSRS_Model_Select_Result.csv")
-    title = ["场内基金名称", "当日涨跌幅", "RSRS因子", "beta分位", "rsquared", "最近多头幅度", "最近多头天数", "最近空头幅度", "最近空头天数", "上一多头幅度", "上一多头天数", "上一空头幅度", "上一空头天数"]
+    title = ["场内基金名称", "当日涨跌幅", "RSRS因子", "beta分位", "rsquared", "最近多头幅度", "最近多头天数", "最近空头幅度", "最近空头天数", "上一多头幅度", "上一多头天数", "上一空头幅度", "上一空头天数", "上二多头幅度", "上二多头天数", "上二空头幅度", "上二空头天数"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(RSRS_Model_Select_pipeline, os.listdir(funddata_path))
     pool.close()
@@ -437,7 +437,7 @@ def RSRS_Model_Select_par():
     write_csvfile(resultfile_path, title, resultdata_list)
 def RSRS_Model_Select_pipeline(filename):
     N = 16
-    rounddaynum = 10
+    rounddaynum = 20
     _, funddata_list = read_csvfile(os.path.join(funddata_path, filename))
     fundinfo = filename[:filename.rfind(".")]
     closingprice = float(funddata_list[0][6])
@@ -471,22 +471,46 @@ def RSRS_Model_Select_pipeline(filename):
     for ii in range(perioddaynum):
         zscoredist_list[ii] = zscoresort_list.index(zscore_list[ii])/perioddaynum
     minprice_list = []
+    minbeta_list = []
     minoffset_list = []
     maxprice_list = []
+    maxbeta_list = []
     maxoffset_list = []
-    isDrop = True
-    for ii in reversed(range(len(offset_list))):
+    startoffset = perioddaynum-1
+    for ii in range(len(offset_list)):
+        if(beta_list[offset_list[ii]]==min([beta_list[kk] for kk in offset_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)]])):
+            minprice_list.append(closingprice_list[ii])
+            minbeta_list.append(beta_list[ii])
+            minoffset_list.append(ii)
+            startoffset = ii
+            isDrop=True
+            break
+        if(beta_list[offset_list[ii]]==max([beta_list[kk] for kk in offset_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)]])):
+            return []
+    for ii in range(startoffset+1, len(offset_list)):
+        tempmaxbeta = max([beta_list[kk] for kk in offset_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)]])
+        tempminbeta = min([beta_list[kk] for kk in offset_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)]])
         if(isDrop):
-            if(beta_list[offset_list[ii]]==max([beta_list[kk] for kk in offset_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)]])):
-                maxprice_list.insert(0, closingprice_list[offset_list[ii]])
-                maxoffset_list.insert(0, offset_list[ii])
+            if(beta_list[offset_list[ii]]==tempmaxbeta):
+                maxprice_list.append(closingprice_list[offset_list[ii]])
+                maxbeta_list.append(beta_list[offset_list[ii]])
+                maxoffset_list.append(offset_list[ii])
                 isDrop=False
+            elif((beta_list[offset_list[ii]]==tempminbeta) and (beta_list[offset_list[ii]]<minbeta_list[-1])):
+                minprice_list[-1] = closingprice_list[offset_list[ii]]
+                minbeta_list[-1] = beta_list[offset_list[ii]]
+                minoffset_list[-1] = offset_list[ii]
         else:
-            if(beta_list[offset_list[ii]]==min([beta_list[kk] for kk in offset_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)]])):
-                minprice_list.insert(0, closingprice_list[offset_list[ii]])
-                minoffset_list.insert(0, offset_list[ii])
+            if(beta_list[offset_list[ii]]==tempminbeta):
+                minprice_list.append(closingprice_list[offset_list[ii]])
+                minbeta_list.append(beta_list[offset_list[ii]])
+                minoffset_list.append(offset_list[ii])
                 isDrop=True
-    if((len(minprice_list)>3) and (len(maxprice_list)>3) and (isDrop)):
+            elif((beta_list[offset_list[ii]]==tempmaxbeta) and (beta_list[offset_list[ii]]>maxbeta_list[-1])):
+                maxprice_list[-1] = closingprice_list[offset_list[ii]]
+                maxbeta_list[-1] = beta_list[offset_list[ii]]
+                maxoffset_list[-1] = offset_list[ii]
+    if((len(minprice_list)>3) and (len(maxprice_list)>3)):
         reboundcounter = minoffset_list[0]
         reboundrange = (closingprice/minprice_list[0]-1)*100
         failcounter = maxoffset_list[0]-minoffset_list[0]
@@ -495,8 +519,13 @@ def RSRS_Model_Select_pipeline(filename):
         lastreboundrange = (maxprice_list[0]/minprice_list[1]-1)*100
         lastfailcounter = maxoffset_list[1]-minoffset_list[1]
         lastfailrange = (minprice_list[1]/maxprice_list[1]-1)*100
-        if((reboundrange<20) and (beta_list[minoffset_list[0]]<beta_list[minoffset_list[1]])):
-            return [fundinfo, funddata_list[0][8], zscore_list[0], betadist_list[0], rsquared_list[0], reboundrange, reboundcounter, failrange, failcounter, lastreboundrange, lastreboundcounter, lastfailrange, lastfailcounter]
+        penultreboundcounter = minoffset_list[2]-maxoffset_list[1]
+        penultreboundrange = (maxprice_list[1]/minprice_list[2]-1)*100
+        penultfailcounter = maxoffset_list[2]-minoffset_list[2]
+        penultfailrange = (minprice_list[2]/maxprice_list[2]-1)*100
+        sumrange = reboundrange+failrange+lastreboundrange+lastfailrange+penultreboundrange+penultfailrange
+        if((reboundrange<20) and (minbeta_list[0]<minbeta_list[1]) and (reboundcounter>3) and (sumrange<-10)):
+            return [fundinfo, funddata_list[0][8], zscore_list[0], betadist_list[0], rsquared_list[0], reboundrange, reboundcounter, failrange, failcounter, lastreboundrange, lastreboundcounter, lastfailrange, lastfailcounter, penultreboundrange, penultreboundcounter, penultfailrange, penultfailcounter]
     return []
 
 
