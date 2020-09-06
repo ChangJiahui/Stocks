@@ -265,7 +265,7 @@ def repurchase_Model_Select():
 def block_Model_Select():
 # 大宗交易数据
     resultfile_path = os.path.join(resultdata_path, "block_Model_Select_Result.csv")
-    title = ["股票名称", "交易日期", "交易溢价率", "交易后最大涨幅", "交易后最大跌幅", "交易换手率", "交易/当日量比", "交易/今日量比", "成交金额", "买方营业部", "卖方营业部", "历史位置", "百日位置", "盈利比例"]
+    title = ["股票名称", "交易日期", "当前溢价率", "交易溢价率", "交易后最大涨幅", "交易后最大跌幅", "交易换手率", "交易/当日量比", "交易/今日量比", "成交金额", "买方营业部", "卖方营业部", "历史位置", "百日位置", "盈利比例"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         stockinfo = filename.split('.')[0]
@@ -297,7 +297,8 @@ def block_Model_Select():
                     blockoffset = jj
                     break
             closingprice_list = [float(item[3]) for item in stockdata_list[:(blockoffset+1)]]
-            convpre = (float(block_list[0][2])/closingprice_list[blockoffset]-1)*100
+            convpre1 = (float(block_list[0][2])/closingprice_list[0]-1)*100
+            convpre2 = (float(block_list[0][2])/closingprice_list[blockoffset]-1)*100
             volumnratio1 = (float(block_list[0][4])*10000/float(stockdata_list[blockoffset][11]))
             tradevolumn = volumnratio1*float(stockdata_list[blockoffset][10])
             volumnratio2 = tradevolumn/float(stockdata_list[0][10])
@@ -312,7 +313,7 @@ def block_Model_Select():
                     reboundrange1 = EHBFitem[5]
                     reboundrange2 = EHBFitem[6]
                     earnratio = EHBFitem[9]
-            resultdata_list.append([stockinfo, stockdata_list[blockoffset][0], convpre, riserange, failrange, tradevolumn, volumnratio1, volumnratio2, block_list[ii][4], block_list[ii][5], block_list[ii][6], reboundrange1, reboundrange2, earnratio])
+            resultdata_list.append([stockinfo, stockdata_list[blockoffset][0], convpre1, convpre2, riserange, failrange, tradevolumn, volumnratio1, volumnratio2, block_list[ii][4], block_list[ii][5], block_list[ii][6], reboundrange1, reboundrange2, earnratio])
     write_csvfile(resultfile_path, title, resultdata_list)
 
 
@@ -482,4 +483,5 @@ def main():
 
 
 if __name__=="__main__":
-    main()
+#    main()
+    block_Model_Select()
