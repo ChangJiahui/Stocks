@@ -5,6 +5,8 @@
 
 采用 Python 编写的可在 Windows 上定时运行的股票量化分析模型
 
+[Python 依赖库](https://github.com/ChangJiahui/Stocks/blob/master/ProjectSupport.md)
+
 ## 源代码
 + fundsAnalyze.py (每日运行基金量化分析)
 	+ 每日天天基金网基金列表更新
