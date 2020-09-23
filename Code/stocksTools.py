@@ -483,5 +483,4 @@ def main():
 
 
 if __name__=="__main__":
-#    main()
-    block_Model_Select()
+    main()
