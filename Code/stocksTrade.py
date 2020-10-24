@@ -96,15 +96,15 @@ def trade_analyze():
         elif(minprice<=float(tradeitem[5])):
             strvar = "\t突破箱体下沿提示 低位价格: " + str(tradeitem[5]) + "\n"
         perioddaynum = min(500, len(stockdata_list))
-        rounddaynum = 10
+        rounddaynum = 20
         closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum]]
         for ii in range(perioddaynum):
             if(closingprice_list[ii]==min(closingprice_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])):
-                tradeitem[5] = closingprice_list[ii]
+                tradeitem[5] = str(closingprice_list[ii])
                 break
         for ii in range(perioddaynum):
             if(closingprice_list[ii]==max(closingprice_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])):
-                tradeitem[6] = closingprice_list[ii]
+                tradeitem[6] = str(closingprice_list[ii])
                 break
         return strvar
 
@@ -651,6 +651,56 @@ def trade_analyze():
             strvar = "\tamptrend死叉卖出信号 卖出价格: " + str(round(closingprice_list[0],2)) + "\n"
         return strvar
 
+    def RSRS_Model_Trade_pipeline(stockdata_list):
+        strvar = ""
+        N = 16
+        rounddaynum = 20
+        closingprice = float(stockdata_list[0][3])
+        perioddaynum = min(1000, len(stockdata_list)-N)
+        if(perioddaynum<300):
+            return strvar
+        closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N]]
+        upperprice_list = [float(item[4]) for item in stockdata_list[:perioddaynum+N]]
+        lowerprice_list = [float(item[5]) for item in stockdata_list[:perioddaynum+N]]
+        beta_list = [0]*perioddaynum
+        betadist_list = [0]*perioddaynum
+        rsquared_list = [0]*perioddaynum
+        zscore_list = [0]*perioddaynum
+        zscoredist_list = [0]*perioddaynum
+        offset_list = []
+        for ii in range(perioddaynum):
+            model = sm.OLS(upperprice_list[ii:ii+N], sm.add_constant(lowerprice_list[ii:ii+N]))
+            modelfit = model.fit()
+            if(len(modelfit.params)==2):
+                beta = modelfit.params[1]
+                r2 = modelfit.rsquared
+                beta_list[ii] = beta
+                rsquared_list[ii] = r2
+                zscore_list[ii] = beta*r2
+                if(r2>0.9):
+                    offset_list.append(ii)
+        betasort_list = sorted(beta_list)
+        for ii in range(perioddaynum):
+            betadist_list[ii] = betasort_list.index(beta_list[ii])/perioddaynum
+        zscoresort_list = sorted(zscore_list)
+        for ii in range(perioddaynum):
+            zscoredist_list[ii] = zscoresort_list.index(zscore_list[ii])/perioddaynum
+        minprice_list = []
+        minbeta_list = []
+        minoffset_list = []
+        maxprice_list = []
+        maxbeta_list = []
+        maxoffset_list = []
+        startoffset = perioddaynum-1
+        for ii in range(len(offset_list)):
+            if(beta_list[offset_list[ii]]==min([beta_list[kk] for kk in offset_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)]])):
+                strvar = "\tRSRS买入信号 买入价格: " + str(round(closingprice_list[0],2)) + "\n"
+                break
+            if(beta_list[offset_list[ii]]==max([beta_list[kk] for kk in offset_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)]])):
+                strvar = "\tRSRS卖出信号 卖出价格: " + str(round(closingprice_list[0],2)) + "\n"
+                break
+        return strvar
+
     resultstr = ""
     index_list = ["上证指数_0000001", "深证成指_1399001"]
     for ii in range(len(index_list)):
@@ -668,7 +718,8 @@ def trade_analyze():
                               + DMI_Model_Trade_pipeline(indexdata_list) \
                               + trend1T5_Model_Select_pipeline(indexdata_list) \
                               + amptrend_Model_Trade_pipeline(indexdata_list) \
-                              + stdtrend_Model_Trade_pipeline(indexdata_list)
+                              + stdtrend_Model_Trade_pipeline(indexdata_list) \
+                              + RSRS_Model_Trade_pipeline(indexdata_list)
     title, trade_list = read_csvfile(accountbook_path)
 #    title = ["股票名称", "成本价格", "持仓数量", "最近交易价格", "最近交易数量", "低位价格", "高位价格", "跌3%价格", "涨3%价格", "当前价格", "持仓市值", "最近交易市值", "盈利比例"]
     for ii in range(len(trade_list)):
@@ -699,7 +750,8 @@ def trade_analyze():
                                   + obvtrend_Model_Trade_pipeline(stockdata_list) \
                                   + amptrend_Model_Trade_pipeline(stockdata_list) \
                                   + stdtrend_Model_Trade_pipeline(stockdata_list) \
-                                  + point_Model_Trade_pipeline(trade_list[ii], stockdata_list)
+                                  + point_Model_Trade_pipeline(trade_list[ii], stockdata_list) \
+                                  + RSRS_Model_Trade_pipeline(stockdata_list)
         else:
             resultstr = stockinfo + " 股票名称错误!" + '\n' + resultstr
             trade_list[ii][7:13] = [0]*6
