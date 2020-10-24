@@ -37,6 +37,7 @@ indexdata_path = os.path.join(root_path, "Data", "index_data")
 HKdata_path = os.path.join(root_path, "Data", "stockHK_data")
 Bdata_path = os.path.join(root_path, "Data", "stockAB_data")
 margindata_path = os.path.join(root_path, "Data", "margin_data")
+transferdata_path = os.path.join(root_path, "Data", "transfer_data")
 resultdata_path = os.path.join(root_path, "Result", "Stocks")
 querydata_path = os.path.join(root_path, "Result", "Query")
 
@@ -146,6 +147,10 @@ def gen_tscode(stockcode):
     elif(stockcode[0]=="6"):
         code=stockcode+".SH"
     return code
+
+
+def gen_stockdate(datestr):
+	return datestr[0:4]+'-'+datestr[4:6]+'-'+datestr[6:8]
 
 
 def gen_163code(stockcode):
@@ -1747,14 +1752,14 @@ def volumn_Model_Select_pipeline(filename):
 
 def tangle_Model_Select():
 # 1-5-10-30-60日线纠缠
-    title = ["股票名称", "当日涨跌幅", "百日位置(%)", "日线纠缠幅度", "日线纠缠天数", "日线偏离幅度", "日线偏离天数"]
+    title = ["股票名称", "当日涨跌幅", "日线纠缠幅度", "日线纠缠天数", "日线偏离幅度", "日线偏离天数", "上一日线纠缠幅度", "上一日线纠缠天数", "上一日线偏离幅度", "上一日线偏离天数", "百日最大偏离天数", "百日最大偏离跌幅"]
     resultfile_path = os.path.join(resultdata_path, "tangle_Model_Select_Result.csv")
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         resultdata_list.append(tangle_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
 def tangle_Model_Select_par():
-    title = ["股票名称", "当日涨跌幅", "百日位置(%)", "日线纠缠幅度", "日线纠缠天数", "日线偏离幅度", "日线偏离天数"]
+    title = ["股票名称", "当日涨跌幅", "日线纠缠幅度", "日线纠缠天数", "日线偏离幅度", "日线偏离天数", "上一日线纠缠幅度", "上一日线纠缠天数", "上一日线偏离幅度", "上一日线偏离天数", "百日最大偏离天数", "百日最大偏离跌幅"]
     resultfile_path = os.path.join(resultdata_path, "tangle_Model_Select_Result.csv")
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(tangle_Model_Select_pipeline, os.listdir(stockdata_path))
@@ -1763,7 +1768,7 @@ def tangle_Model_Select_par():
     write_csvfile(resultfile_path, title, resultdata_list)
 def tangle_Model_Select_pipeline(filename):
     N_list = [1, 5, 10, 30, 60]
-    P = 0.1
+    rounddaynum = 20
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     closingprice = float(stockdata_list[0][3])
@@ -1773,34 +1778,82 @@ def tangle_Model_Select_pipeline(filename):
     closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+max(N_list)]]
     MA_list = [[0]*len(N_list)]*perioddaynum
     div_list = [0]*perioddaynum
-    divdist_list = [0]*perioddaynum
     for ii in range(perioddaynum):
         for jj in range(len(N_list)):
             MA_list[ii][jj]=np.mean(closingprice_list[ii:ii+N_list[jj]])
         div_list[ii] = 2*(max(MA_list[ii])-min(MA_list[ii]))/(max(MA_list[ii])+min(MA_list[ii]))
-    divsort_list = sorted(div_list)
+    minprice_list = []
+    mindiv_list = []
+    minoffset_list = []
+    maxprice_list = []
+    maxdiv_list = []
+    maxoffset_list = []
+    startoffset = perioddaynum-1
     for ii in range(perioddaynum):
-        divdist_list[ii] = divsort_list.index(div_list[ii])/perioddaynum
-    if(divdist_list[0]<P):
-        tanglecounter = 1
-        for ii in range(1,perioddaynum):
-            if(divdist_list[ii]<P):
-                tanglecounter+=1
-            else:
-                break
-        tanglerange = (closingprice/closingprice_list[tanglecounter]-1)*100
-        divcounter = 0
-        for ii in range(tanglecounter, perioddaynum):
-            if(divdist_list[ii]<P):
-                break
-            else:
-                divcounter+=1
-        divrange = (closingprice_list[tanglecounter]/closingprice_list[tanglecounter+divcounter]-1)*100
-        maxprice = max(closingprice_list[:100])
-        minprice = min(closingprice_list[:100])
-        reboundrange = (closingprice-minprice)/(maxprice-minprice)*100
-        if(reboundrange<50):
-            return [stockinfo, stockdata_list[0][9], reboundrange, tanglerange, tanglecounter, divrange, divcounter]
+        tempmaxdiv = max(div_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])
+        tempmindiv = min(div_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])
+        if(div_list[ii]==tempmindiv):
+            minprice_list.append(closingprice_list[ii])
+            mindiv_list.append(div_list[ii])
+            minoffset_list.append(ii)
+            startoffset = ii
+            isDrop=True
+            break
+        if(div_list[ii]==tempmaxdiv):
+            return []
+    for ii in range(startoffset+1, perioddaynum):
+        tempmaxdiv = max(div_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])
+        tempmindiv = min(div_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])
+        if(isDrop):
+            if(div_list[ii]==tempmaxdiv):
+                maxprice_list.append(closingprice_list[ii])
+                maxdiv_list.append(div_list[ii])
+                maxoffset_list.append(ii)
+                isDrop=False
+            elif((div_list[ii]==tempmindiv) and (div_list[ii]<mindiv_list[-1])):
+                minprice_list[-1] = closingprice_list[ii]
+                mindiv_list[-1] = div_list[ii]
+                minoffset_list[-1] = ii
+        else:
+            if(div_list[ii]==tempmindiv):
+                minprice_list.append(closingprice_list[ii])
+                mindiv_list.append(div_list[ii])
+                minoffset_list.append(ii)
+                isDrop=True
+            elif((div_list[ii]==tempmaxdiv) and (div_list[ii]>maxdiv_list[-1])):
+                maxprice_list[-1] = closingprice_list[ii]
+                maxdiv_list[-1] = div_list[ii]
+                maxoffset_list[-1] = ii
+    if((len(minoffset_list)>3) and (len(maxoffset_list)>3)):
+        failrange = (minprice_list[0]/maxprice_list[0]-1)*100
+        failcounter = maxoffset_list[0]-minoffset_list[0]
+        reboundrange = (closingprice/minprice_list[0]-1)*100
+        reboundcounter = minoffset_list[0]
+        lastfailrange = (minprice_list[1]/maxprice_list[1]-1)*100
+        lastfailcounter = maxoffset_list[1]-minoffset_list[1]
+        lastreboundrange = (maxprice_list[0]/minprice_list[1]-1)*100
+        lastreboundcounter = minoffset_list[1]-maxoffset_list[0]
+        maxdiv = max(div_list[:min(100, perioddaynum)])
+        maxdivdate = stockdata_list[div_list.index(maxdiv)][0]
+        mindiv = min(div_list[:min(100, perioddaynum)])
+        mindivdate = stockdata_list[div_list.index(mindiv)][0]
+        maxmodelcounter = 0
+        maxmodelrange = 0
+        for ii in range(failcounter, min(100, perioddaynum)):
+            tempmodelcounter = 0
+            tempmodelrange = 0
+            for jj in range(ii, perioddaynum-1):
+                if(div_list[jj]<div_list[jj+1]):
+                    tempmodelcounter += 1
+                else:
+                    tempmodelrange = (closingprice_list[ii]/closingprice_list[ii+tempmodelcounter]-1)*100
+                    if(maxmodelcounter<tempmodelcounter):
+                        maxmodelcounter = tempmodelcounter
+                    if(maxmodelrange>tempmodelrange):
+                        maxmodelrange = tempmodelrange
+                    break
+        if(failrange<maxmodelrange*2/3):
+            return [stockinfo, stockdata_list[0][9], reboundrange, reboundcounter, failrange, failcounter, lastreboundrange, lastreboundcounter, lastfailrange, lastfailcounter, maxmodelcounter, maxmodelrange]
     return []
 
 
@@ -2024,14 +2077,14 @@ def KDJ_Model_Select_pipeline(filename):
 def CCI_Model_Select():
 # CCI 模型 n=14
     resultfile_path = os.path.join(resultdata_path, "CCI_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "CCI上涨天数", "CCI上涨幅度", "CCI下跌天数", "CCI下跌幅度", "当日CCI", "百日最大下跌天数", "百日最大下跌幅度", "百日最低CCI值", "日期", "百日最高CCI值", "日期"]
+    title = ["股票名称", "当日涨跌幅", "CCI回升天数", "CCI回升幅度", "CCI下跌天数", "CCI下跌幅度", "上一CCI回升天数", "上一CCI回升幅度", "上一CCI下跌天数", "上一CCI下跌幅度", "当日CCI", "百日最大下跌天数", "百日最大下跌幅度", "百日最低CCI值", "日期", "百日最高CCI值", "日期"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         resultdata_list.append(CCI_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
 def CCI_Model_Select_par():
     resultfile_path = os.path.join(resultdata_path, "CCI_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "CCI上涨天数", "CCI上涨幅度", "CCI下跌天数", "CCI下跌幅度", "当日CCI", "百日最大下跌天数", "百日最大下跌幅度", "百日最低CCI值", "日期", "百日最高CCI值", "日期"]
+    title = ["股票名称", "当日涨跌幅", "CCI回升天数", "CCI回升幅度", "CCI下跌天数", "CCI下跌幅度", "上一CCI回升天数", "上一CCI回升幅度", "上一CCI下跌天数", "上一CCI下跌幅度", "当日CCI", "百日最大下跌天数", "百日最大下跌幅度", "百日最低CCI值", "日期", "百日最高CCI值", "日期"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(CCI_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -2039,6 +2092,7 @@ def CCI_Model_Select_par():
     write_csvfile(resultfile_path, title, resultdata_list)
 def CCI_Model_Select_pipeline(filename):
     N = 14
+    rounddaynum = 20
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     closingprice = float(stockdata_list[0][3])
@@ -2052,28 +2106,63 @@ def CCI_Model_Select_pipeline(filename):
     MA_list = [0]*perioddaynum
     MD_list = [0]*perioddaynum
     CCI_list = [0]*perioddaynum
-    maxprice_list = []
-    minprice_list = []
-    maxoffset_list = []
-    minoffset_list = []
     for ii in range(perioddaynum+N):
         TP_list[ii] = (closingprice_list[ii]+upperprice_list[ii]+lowerprice_list[ii])/3
     for ii in range(perioddaynum):
         MA_list[ii] = np.mean(TP_list[ii:ii+N])
         MD_list[ii] = np.mean(np.abs([TP_list[jj]-MA_list[ii] for jj in range(ii,ii+N)]))
         CCI_list[ii] = (TP_list[ii]-MA_list[ii])/MD_list[ii]/0.015
-    for ii in range(1, perioddaynum-1):
-        if((CCI_list[ii]>CCI_list[ii-1]) and (CCI_list[ii]>CCI_list[ii+1])):
-            maxprice_list.append(closingprice_list[ii])
-            maxoffset_list.append(ii)
-        if((CCI_list[ii]<CCI_list[ii-1]) and (CCI_list[ii]<CCI_list[ii+1])):
+    minprice_list = []
+    minCCI_list = []
+    minoffset_list = []
+    maxprice_list = []
+    maxCCI_list = []
+    maxoffset_list = []
+    startoffset = perioddaynum-1
+    for ii in range(perioddaynum):
+        tempmaxCCI = max(CCI_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])
+        tempminCCI = min(CCI_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])
+        if(CCI_list[ii]==tempminCCI):
             minprice_list.append(closingprice_list[ii])
+            minCCI_list.append(CCI_list[ii])
             minoffset_list.append(ii)
-    if((len(minoffset_list)>3) and (len(maxoffset_list)>3) and (minoffset_list[0]<maxoffset_list[0])):
+            startoffset = ii
+            isDrop=True
+            break
+        if(CCI_list[ii]==tempmaxCCI):
+            return []
+    for ii in range(startoffset+1, perioddaynum):
+        tempmaxCCI = max(CCI_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])
+        tempminCCI = min(CCI_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])
+        if(isDrop):
+            if(CCI_list[ii]==tempmaxCCI):
+                maxprice_list.append(closingprice_list[ii])
+                maxCCI_list.append(CCI_list[ii])
+                maxoffset_list.append(ii)
+                isDrop=False
+            elif((CCI_list[ii]==tempminCCI) and (CCI_list[ii]<minCCI_list[-1])):
+                minprice_list[-1] = closingprice_list[ii]
+                minCCI_list[-1] = CCI_list[ii]
+                minoffset_list[-1] = ii
+        else:
+            if(CCI_list[ii]==tempminCCI):
+                minprice_list.append(closingprice_list[ii])
+                minCCI_list.append(CCI_list[ii])
+                minoffset_list.append(ii)
+                isDrop=True
+            elif((CCI_list[ii]==tempmaxCCI) and (CCI_list[ii]>maxCCI_list[-1])):
+                maxprice_list[-1] = closingprice_list[ii]
+                maxCCI_list[-1] = CCI_list[ii]
+                maxoffset_list[-1] = ii
+    if((len(minoffset_list)>3) and (len(maxoffset_list)>3)):
         failrange = (minprice_list[0]/maxprice_list[0]-1)*100
         failcounter = maxoffset_list[0]-minoffset_list[0]
         reboundrange = (closingprice/minprice_list[0]-1)*100
         reboundcounter = minoffset_list[0]
+        lastfailrange = (minprice_list[1]/maxprice_list[1]-1)*100
+        lastfailcounter = maxoffset_list[1]-minoffset_list[1]
+        lastreboundrange = (maxprice_list[0]/minprice_list[1]-1)*100
+        lastreboundcounter = minoffset_list[1]-maxoffset_list[0]
         maxCCI = max(CCI_list[:min(100, perioddaynum)])
         maxCCIdate = stockdata_list[CCI_list.index(maxCCI)][0]
         minCCI = min(CCI_list[:min(100, perioddaynum)])
@@ -2094,7 +2183,7 @@ def CCI_Model_Select_pipeline(filename):
                         maxmodelrange = tempmodelrange
                     break
         if(failrange<maxmodelrange*2/3):
-            return [stockinfo, stockdata_list[0][9], reboundcounter, reboundrange, failcounter, failrange, CCI_list[0], maxmodelcounter, maxmodelrange, minCCI, minCCIdate, maxCCI, maxCCIdate]
+            return [stockinfo, stockdata_list[0][9], reboundcounter, reboundrange, failcounter, failrange, lastreboundcounter, lastreboundrange, lastfailcounter, lastfailrange, CCI_list[0], maxmodelcounter, maxmodelrange, minCCI, minCCIdate, maxCCI, maxCCIdate]
     return []
 
 
@@ -3152,21 +3241,26 @@ def margin_Model_Select():
                 marginData_list.append([stockinfo, rzmrb, rzjmrb, rqmcb, rqjmcb])
             margin_title = ["日期", "股票代码", "融资余额", "融券余额", "融资买入额", "融券余量", "融资偿还额", "融券偿还量", "融券卖出量", "融资融券余额"]
             for ii in reversed(range(len(marginData_list))):
-                try:
-                    time.sleep(1)
-                    margin_df = tspro.margin_detail(ts_code=gen_tscode(marginData_list[ii][0][-6:]), start_date=start_time, end_date=end_time)
-                    margin_df = margin_df[["trade_date", "ts_code", "rzye", "rqye", "rzmre", "rqyl", "rzche", "rqchl", "rqmcl", "rzrqye"]]
-                    margin_list = margin_df.values.tolist()
-                    for jj in reversed(range(len(margin_list))):
-                        if(np.isnan(margin_list[jj][2:]).any()):
-                            margin_list.pop(jj)
-                        else:
-                            margin_list[jj][0] = margin_list[jj][0][0:4]+'-'+margin_list[jj][0][4:6]+'-'+margin_list[jj][0][6:8]
-                    write_csvfile(os.path.join(margindata_path, marginData_list[ii][0]+'.csv'), margin_title, margin_list)
-                except Exception as e:
-                    print(e)
+                isErrorFind = True
+                for jj in range(3):
+                    try:
+                        time.sleep(1)
+                        margin_df = tspro.margin_detail(ts_code=gen_tscode(marginData_list[ii][0][-6:]), start_date=start_time, end_date=end_time)
+                        margin_df = margin_df[["trade_date", "ts_code", "rzye", "rqye", "rzmre", "rqyl", "rzche", "rqchl", "rqmcl", "rzrqye"]]
+                        margin_list = margin_df.values.tolist()
+                        for jj in reversed(range(len(margin_list))):
+                            if(np.isnan(margin_list[jj][2:]).any()):
+                                margin_list.pop(jj)
+                            else:
+                                margin_list[jj][0] = gen_stockdate(margin_list[jj][0])
+                        write_csvfile(os.path.join(margindata_path, marginData_list[ii][0]+'.csv'), margin_title, margin_list)
+                        isErrorFind = False
+                        break
+                    except Exception as e:
+                        print(e)
+                        time.sleep(600)
+                if(isErrorFind):
                     marginData_list.pop(ii)
-                    time.sleep(600)
             write_csvfile(marginfile_path, marginData_title, marginData_list)
             return True
         else:
@@ -3256,6 +3350,142 @@ def margin_Model_Select():
                         if((rzjyefailrange<lastrzjyefailrange) and (rzjyefailcounter>lastrzjyefailcounter) and (3<rzjyereboundcounter) and (pricefailrange<-10)  and (pricereboundrange<abs(pricefailrange)/3)):
                             resultdata_list.append([stockinfo, rzjyerange, rzjye_list[0], rzjyereboundrange, pricereboundrange, rzjyereboundcounter, rzjyefailrange, pricefailrange, rzjyefailcounter,
                                                     lastrzjyereboundrange, lastpricereboundrange, lastrzjyereboundcounter, lastrzjyefailrange, lastpricefailrange, lastrzjyefailcounter])
+                    break
+        write_csvfile(resultfile_path, title, resultdata_list)
+
+
+def transfer_Model_Select():
+# 沪深股通标的
+    transferfile_path = os.path.join(transferdata_path , end_time+".csv")
+
+    def get_transferdata():
+        transferData_title = ["股票名称", "外资持股数量", "外资持股比例"]
+        transfer_df = tspro.hk_hold(trade_date=end_time)
+        transfer_df = transfer_df[["code", "name", "ts_code", "vol", "ratio"]]
+#        transfer_df = transfer_df.dropna(axis=0, how='any')
+        transferData_list = []
+        if(not transfer_df.empty):
+            for transferitem in transfer_df.values.tolist():
+                if(len(transferitem)!=5):
+                    continue
+                stocktscode = transferitem[2]
+                stockcode = transferitem[0]
+                stockname = transferitem[1]
+                if((stocktscode[:3]=='300') or (stocktscode[-2:]=="HK") or ("ST" in stockname)):
+                    continue
+                stockinfo = stockname+'_'+stocktscode[:6]
+                transvol = transferitem[3]
+                transratio = transferitem[4]
+                transferData_list.append([stockinfo, transvol, transratio])
+            transfer_title = ["日期", "股票代码", "外资持股数量", "外资持股比例"]
+            for ii in reversed(range(len(transferData_list))):
+                isErrorFind = True
+                for jj in range(3):
+                    try:
+                        time.sleep(1)
+                        transfer_df = tspro.hk_hold(ts_code=gen_tscode(transferData_list[ii][0][-6:]), start_date=start_time, end_date=end_time)
+                        transfer_df = transfer_df[["trade_date", "ts_code", "vol", "ratio"]]
+                        transfer_list = transfer_df.values.tolist()
+    #                    for jj in reversed(range(len(transfer_list))):
+    #                        if(np.isnan(transfer_list[jj][2:]).any()):
+    #                            transfer_list.pop(jj)
+                        write_csvfile(os.path.join(transferdata_path, transferData_list[ii][0]+'.csv'), transfer_title, transfer_list)
+                        isErrorFind = False
+                        break
+                    except Exception as e:
+                        print(e)
+                        time.sleep(600)
+                if(isErrorFind):
+                    transferData_list.pop(ii)
+            write_csvfile(transferfile_path, transferData_title, transferData_list)
+            return True
+        else:
+            return False
+
+    resultfile_path = os.path.join(resultdata_path, "transfer_Model_Select_Result.csv")
+    title = ["股票名称", "1日外资持股变化", "当前持股数量", "当前持股比例", "外资持股最近回升幅度", "回升股价变化", "最近回升天数", "外资持股最近下降幅度", "下降股价变化", "最近下降天数", "外资持股上一回升幅度", "回升股价变化", "上一回升天数", "外资持股上一下降幅度", "下降股价变化", "上一下降天数"]
+    resultdata_list = []
+    if(get_transferdata()):
+        _, transferData_list = read_csvfile(transferfile_path)
+        rounddaynum = 10
+        for transferData in transferData_list:
+            for filename in os.listdir(stockdata_path):
+                if(transferData[0][-6:]==filename.split(".")[0][-6:]):
+                    _, transfer_list = read_csvfile(os.path.join(transferdata_path, transferData[0]+'.csv'))
+                    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+                    stockinfo = filename.split(".")[0]
+                    closingprice = float(stockdata_list[0][3])
+                    perioddaynum = min(400, len(transfer_list))
+                    rounddaynum = 10
+                    if(perioddaynum<50):
+                        break
+                    transvol_list = [float(transfer_list[ii][2]) for ii in range(perioddaynum)]
+                    transvolrange = ((transvol_list[0]/transvol_list[1])-1)*100
+                    minoffset = perioddaynum-1
+                    maxoffset = perioddaynum-1
+                    mintransvol_list = []
+                    minprice_list = []
+                    mintransvoloffset_list = []
+                    minpriceoffset_list = []
+                    maxtransvol_list = []
+                    maxprice_list = []
+                    maxtransvoloffset_list = []
+                    maxpriceoffset_list = []
+                    startoffset = perioddaynum-1
+                    for ii in range(perioddaynum):
+                        if(transvol_list[ii]==min(transvol_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])):
+                            mintransvol_list.append(transvol_list[ii])
+                            mintransvoloffset_list.append(ii)
+                            startoffset = ii
+                            isDrop = True
+                            break
+                    for ii in range(startoffset+1, perioddaynum):
+                        tempmaxtransvol = max(transvol_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])
+                        tempmintransvol = min(transvol_list[max(0,ii-rounddaynum):min(perioddaynum,ii+rounddaynum+1)])
+                        if(isDrop):
+                            if(transvol_list[ii]==tempmaxtransvol):
+                                maxtransvol_list.append(transvol_list[ii])
+                                maxtransvoloffset_list.append(ii)
+                                isDrop = False
+                            elif((transvol_list[ii]==tempmintransvol) and (transvol_list[ii]<mintransvol_list[-1])):
+                                mintransvol_list[-1]=transvol_list[ii]
+                                mintransvoloffset_list[-1]=ii
+                        else:
+                            if(transvol_list[ii]==tempmintransvol):
+                                mintransvol_list.append(transvol_list[ii])
+                                mintransvoloffset_list.append(ii)
+                                isDrop = True
+                            elif((transvol_list[ii]==tempmaxtransvol) and (transvol_list[ii]>maxtransvol_list[-1])):
+                                maxtransvol_list[-1]=transvol_list[ii]
+                                maxtransvoloffset_list[-1]=ii
+                    for ii in range(len(mintransvoloffset_list)):
+                        for jj in range(len(stockdata_list)):
+                            if(stockdata_list[jj][0]<=gen_stockdate(transfer_list[mintransvoloffset_list[ii]][0])):
+                                minprice_list.append(float(stockdata_list[jj][3]))
+                                minpriceoffset_list.append(jj)
+                                break
+                    for ii in range(len(maxtransvoloffset_list)):
+                        for jj in range(len(stockdata_list)):
+                            if(stockdata_list[jj][0]<=gen_stockdate(transfer_list[maxtransvoloffset_list[ii]][0])):
+                                maxprice_list.append(float(stockdata_list[jj][3]))
+                                maxpriceoffset_list.append(jj)
+                                break
+                    if((len(mintransvol_list)>=2) and (len(maxtransvol_list)>=2)):
+                        transvolfailrange = (mintransvol_list[0]/maxtransvol_list[0]-1)*100
+                        pricefailrange = (minprice_list[0]/maxprice_list[0]-1)*100
+                        transvolfailcounter = maxtransvoloffset_list[0]-mintransvoloffset_list[0]
+                        transvolreboundrange = (transvol_list[0]/mintransvol_list[0]-1)*100
+                        pricereboundrange = (closingprice/minprice_list[0]-1)*100
+                        transvolreboundcounter = mintransvoloffset_list[0]
+                        lasttransvolfailrange = (mintransvol_list[1]/maxtransvol_list[1]-1)*100
+                        lastpricefailrange = (minprice_list[1]/maxprice_list[1]-1)*100
+                        lasttransvolfailcounter = maxtransvoloffset_list[1]-mintransvoloffset_list[1]
+                        lasttransvolreboundrange = (maxtransvol_list[0]/mintransvol_list[1]-1)*100
+                        lastpricereboundrange = (maxprice_list[0]/minprice_list[1]-1)*100
+                        lasttransvolreboundcounter = mintransvoloffset_list[1]-maxtransvoloffset_list[0]
+                        if((transvolfailrange<lasttransvolfailrange) and (transvolfailcounter>lasttransvolfailcounter) and (3<transvolreboundcounter) and (pricefailrange<-10)  and (pricereboundrange<abs(pricefailrange)/3)):
+                            resultdata_list.append([stockinfo, transvolrange, transfer_list[0][2], transfer_list[0][3], transvolreboundrange, pricereboundrange, transvolreboundcounter, transvolfailrange, pricefailrange, transvolfailcounter,
+                                                    lasttransvolreboundrange, lastpricereboundrange, lasttransvolreboundcounter, lasttransvolfailrange, lastpricefailrange, lasttransvolfailcounter])
                     break
         write_csvfile(resultfile_path, title, resultdata_list)
 
@@ -3640,6 +3870,7 @@ def CCIMonth_Model_Select_par():
     write_csvfile(resultfile_path, title, resultdata_list)
 def CCIMonth_Model_Select_pipeline(filename):
     N = 14
+    roundmonthnum = 5
     _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
     stockinfo = filename.split(".")[0]
     monthdate_list, monthclosingprice_list, monthupperprice_list, monthlowerprice_list, _ = get_MonthData(stockdata_list)
@@ -3668,14 +3899,49 @@ def CCIMonth_Model_Select_pipeline(filename):
         MA_list[ii] = np.mean(TP_list[ii:ii+N])
         MD_list[ii] = np.mean(np.abs([TP_list[jj]-MA_list[ii] for jj in range(ii,ii+N)]))
         CCI_list[ii] = (TP_list[ii]-MA_list[ii])/MD_list[ii]/0.015
-    for ii in range(1, periodmonthnum-1):
-        if((CCI_list[ii]>CCI_list[ii-1]) and (CCI_list[ii]>CCI_list[ii+1])):
-            maxprice_list.append(monthclosingprice_list[ii])
-            maxoffset_list.append(ii)
-        if((CCI_list[ii]<CCI_list[ii-1]) and (CCI_list[ii]<CCI_list[ii+1])):
+    minprice_list = []
+    minCCI_list = []
+    minoffset_list = []
+    maxprice_list = []
+    maxCCI_list = []
+    maxoffset_list = []
+    startoffset = periodmonthnum-1
+    for ii in range(periodmonthnum):
+        tempmaxCCI = max(CCI_list[max(0,ii-roundmonthnum):min(periodmonthnum,ii+roundmonthnum+1)])
+        tempminCCI = min(CCI_list[max(0,ii-roundmonthnum):min(periodmonthnum,ii+roundmonthnum+1)])
+        if(CCI_list[ii]==tempminCCI):
             minprice_list.append(monthclosingprice_list[ii])
+            minCCI_list.append(CCI_list[ii])
             minoffset_list.append(ii)
-    if((len(minoffset_list)>3) and (len(maxoffset_list)>3) and (minoffset_list[0]<maxoffset_list[0])):
+            startoffset = ii
+            isDrop=True
+            break
+        if(CCI_list[ii]==tempmaxCCI):
+            return []
+    for ii in range(startoffset+1, periodmonthnum):
+        tempmaxCCI = max(CCI_list[max(0,ii-roundmonthnum):min(periodmonthnum,ii+roundmonthnum+1)])
+        tempminCCI = min(CCI_list[max(0,ii-roundmonthnum):min(periodmonthnum,ii+roundmonthnum+1)])
+        if(isDrop):
+            if(CCI_list[ii]==tempmaxCCI):
+                maxprice_list.append(monthclosingprice_list[ii])
+                maxCCI_list.append(CCI_list[ii])
+                maxoffset_list.append(ii)
+                isDrop=False
+            elif((CCI_list[ii]==tempminCCI) and (CCI_list[ii]<minCCI_list[-1])):
+                minprice_list[-1] = monthclosingprice_list[ii]
+                minCCI_list[-1] = CCI_list[ii]
+                minoffset_list[-1] = ii
+        else:
+            if(CCI_list[ii]==tempminCCI):
+                minprice_list.append(monthclosingprice_list[ii])
+                minCCI_list.append(CCI_list[ii])
+                minoffset_list.append(ii)
+                isDrop=True
+            elif((CCI_list[ii]==tempmaxCCI) and (CCI_list[ii]>maxCCI_list[-1])):
+                maxprice_list[-1] = monthclosingprice_list[ii]
+                maxCCI_list[-1] = CCI_list[ii]
+                maxoffset_list[-1] = ii
+    if((len(minoffset_list)>3) and (len(maxoffset_list)>3)):
         failrange = (minprice_list[0]/maxprice_list[0]-1)*100
         failcounter = maxoffset_list[0]-minoffset_list[0]
         reboundrange = (monthclosingprice_list[0]/minprice_list[0]-1)*100
@@ -4172,6 +4438,12 @@ def clear_data():
         filepath = os.path.join(margindata_path, filename)
         if(os.path.exists(filepath)):
             os.remove(filepath)
+    if(not os.path.exists(transferdata_path)):
+        os.mkdir(transferdata_path)
+    for filename in os.listdir(transferdata_path):
+        filepath = os.path.join(transferdata_path, filename)
+        if(os.path.exists(filepath)):
+            os.remove(filepath)
     if(not os.path.exists(indexdata_path)):
         os.mkdir(indexdata_path)
     for filename in os.listdir(indexdata_path):
@@ -4422,6 +4694,9 @@ def analyze_stockdata():
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tmargin_Model_Select Begin!")
     margin_Model_Select()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tmargin_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttransfer_Model_Select Begin!")
+    transfer_Model_Select()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\ttransfer_Model_Select Finished!")
 
 
 def main():
