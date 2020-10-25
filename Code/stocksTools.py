@@ -154,7 +154,7 @@ def get_jsvar(url, varname):
 
 def holders_Model_Select():
     resultfile_path = os.path.join(resultdata_path, "Holders_Analyze_Select.csv")
-    title = ["股票名称", "当前股东人数", "当季股东人数降幅",  "股东人数降低季度", "股东人数总降幅", "历史位置", "百日位置", "盈利比例", "历史最大股东人数", "历史最大股东人数日期", "历史最小股东人数", "历史最小股东人数日期"]
+    title = ["股票名称", "当前股东人数", "当季股东人数降幅",  "股东人数降低季度", "股东人数总降幅", "股价最大涨幅", "股价最大跌幅", "股价当前涨跌幅", "历史位置", "百日位置", "盈利比例", "历史最大股东人数", "历史最大股东人数日期", "历史最小股东人数", "历史最小股东人数日期"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         stockinfo = filename.split('.')[0]
@@ -177,8 +177,8 @@ def holders_Model_Select():
                         else:
                             break
                     if(modelcounter>0):
-                        modelrange = (holdernum_list[0]/holdernum_list[modelcounter]-1)*100
-                        holderrange = (holdernum_list[0]/holdernum_list[1]-1)*100
+                        holdermodelrange = (holdernum_list[0]/holdernum_list[modelcounter]-1)*100
+                        holderquarterrange = (holdernum_list[0]/holdernum_list[1]-1)*100
                         minholdernum = min(holdernum_list[:-2])
                         minholderdate = holders_list[holdernum_list.index(minholdernum)][2]
                         maxholdernum = max(holdernum_list[:-2])
@@ -192,7 +192,19 @@ def holders_Model_Select():
                                 reboundrange1 = EHBFitem[5]
                                 reboundrange2 = EHBFitem[6]
                                 earnratio = EHBFitem[9]
-                        resultdata_list.append([stockinfo, holdernum_list[0], holderrange, modelcounter, modelrange, reboundrange1, reboundrange2, earnratio, maxholdernum, maxholderdate, minholdernum, minholderdate])
+                                stockinfo = EHBFitem[0]
+                                _, stockdata_list = read_csvfile(os.path.join(stockdata_path, "{}.csv".format(stockinfo)))
+                                modeldate = holders_list[modelcounter][2][0:4] + '-' + holders_list[modelcounter][2][4:6] + '-' + holders_list[modelcounter][2][6:8]
+                                modeloffset = len(stockdata_list)-1
+                                for jj in range(len(stockdata_list)):
+                                    if(stockdata_list[jj][0]<=modeldate):
+                                        modeloffset = jj
+                                        break
+                                closingprice_list = [float(item[3]) for item in stockdata_list[:(modeloffset+1)]]
+                                riserange = (max(closingprice_list)/closingprice_list[modeloffset]-1)*100
+                                failrange = (min(closingprice_list)/closingprice_list[modeloffset]-1)*100
+                                modelrange = (closingprice_list[0]/closingprice_list[modeloffset]-1)*100
+                                resultdata_list.append([stockinfo, holdernum_list[0], holderquarterrange, modelcounter, holdermodelrange, riserange, failrange, modelrange, reboundrange1, reboundrange2, earnratio, maxholdernum, maxholderdate, minholdernum, minholderdate])
                 break
             except Exception as e:
                 print(e)
@@ -203,7 +215,7 @@ def holders_Model_Select():
 def gdzjc_Model_Select():
 # 东方财富网增减持数据
     resultfile_path = os.path.join(resultdata_path, "gdzjc_Model_Select_Result.csv")
-    title = ["股票名称", "最新价", "涨跌幅(%)", "股东名称", "增减", "方式", "变动开始日", "变动截止日", "公告日", "变动数量(万股)", "占总股本比例(%)", "占流通股比例(%)",  "持股总数(万股)", "占总股本比例", "持流通股数(万股)", "占流通股比例", "历史位置", "百日位置", "盈利比例"]
+    title = ["股票名称", "最新价", "涨跌幅(%)", "股东名称", "增减", "方式", "变动开始日", "变动截止日", "公告日", "变动数量(万股)", "占总股本比例(%)", "占流通股比例(%)",  "持股总数(万股)", "占总股本比例", "持流通股数(万股)", "占流通股比例", "交易后最大涨幅", "交易后最大跌幅", "当前涨跌幅", "历史位置", "百日位置", "盈利比例"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         stockinfo = filename.split('.')[0]
@@ -228,14 +240,26 @@ def gdzjc_Model_Select():
                             reboundrange1 = EHBFitem[5]
                             reboundrange2 = EHBFitem[6]
                             earnratio = EHBFitem[9]
-                    resultdata_list.append(zjcdata_list[0]+[reboundrange1, reboundrange2, earnratio])
+                            stockinfo = EHBFitem[0]
+                            _, stockdata_list = read_csvfile(os.path.join(stockdata_path, "{}.csv".format(stockinfo)))
+                            modeldate = zjcdata_list[0][6]
+                            modeloffset = len(stockdata_list)-1
+                            for jj in range(len(stockdata_list)):
+                                if(stockdata_list[jj][0]<=modeldate):
+                                    modeloffset = jj
+                                    break
+                            closingprice_list = [float(item[3]) for item in stockdata_list[:(modeloffset+1)]]
+                            riserange = (max(closingprice_list)/closingprice_list[modeloffset]-1)*100
+                            failrange = (min(closingprice_list)/closingprice_list[modeloffset]-1)*100
+                            modelrange = (closingprice_list[0]/closingprice_list[modeloffset]-1)*100
+                            resultdata_list.append(zjcdata_list[0]+[riserange, failrange, modelrange, reboundrange1, reboundrange2, earnratio])
     write_csvfile(resultfile_path, title, resultdata_list)
 
 
 def repurchase_Model_Select():
 # 股票回购信息汇总
     resultfile_path = os.path.join(resultdata_path, "repurchase_Model_Select_Result.csv")
-    title = ["股票代码", "公告日期", "截止日期", "进度", "过期日期", "回购数量", "回购金额", "回购最高价", "回购最低价", "历史位置", "百日位置", "盈利比例"]
+    title = ["股票代码", "公告日期", "截止日期", "进度", "过期日期", "回购数量", "回购金额", "回购最高价", "回购最低价", "交易后最大涨幅", "交易后最大跌幅", "当前涨跌幅", "历史位置", "百日位置", "盈利比例"]
     resultdata_list = []
     for ii in range(3):
         try:
@@ -251,10 +275,21 @@ def repurchase_Model_Select():
                     for EHBFitem in EHBFdata_list:
                         if(EHBFitem[0].split('_')[-1][-6:]==stockinfo):
                             stockinfo = EHBFitem[0]
+                            _, stockdata_list = read_csvfile(os.path.join(stockdata_path, "{}.csv".format(stockinfo)))
                             reboundrange1 = EHBFitem[5]
                             reboundrange2 = EHBFitem[6]
                             earnratio = EHBFitem[9]
-                    resultdata_list.append([stockinfo]+list(item)[1:]+[reboundrange1, reboundrange2, earnratio])
+                            modeldate = item[1][0:4] + '-' + item[1][4:6] + '-' + item[1][6:8]
+                            modeloffset = len(stockdata_list)-1
+                            for jj in range(len(stockdata_list)):
+                                if(stockdata_list[jj][0]<=modeldate):
+                                    modeloffset = jj
+                                    break
+                            closingprice_list = [float(item[3]) for item in stockdata_list[:(modeloffset+1)]]
+                            riserange = (max(closingprice_list)/closingprice_list[modeloffset]-1)*100
+                            failrange = (min(closingprice_list)/closingprice_list[modeloffset]-1)*100
+                            modelrange = (closingprice_list[0]/closingprice_list[modeloffset]-1)*100
+                            resultdata_list.append([stockinfo]+list(item)[1:]+[riserange, failrange, modelrange, reboundrange1, reboundrange2, earnratio])
             break
         except Exception as e:
             print(e)
@@ -265,7 +300,7 @@ def repurchase_Model_Select():
 def block_Model_Select():
 # 大宗交易数据
     resultfile_path = os.path.join(resultdata_path, "block_Model_Select_Result.csv")
-    title = ["股票名称", "交易日期", "当前溢价率", "交易溢价率", "交易后最大涨幅", "交易后最大跌幅", "交易换手率", "交易/当日量比", "交易/今日量比", "成交金额", "买方营业部", "卖方营业部", "历史位置", "百日位置", "盈利比例"]
+    title = ["股票名称", "交易日期", "当前溢价率", "交易溢价率", "交易后最大涨幅", "交易后最大跌幅", "当前涨跌幅", "交易换手率", "交易/当日量比", "交易/今日量比", "成交金额", "买方营业部", "卖方营业部", "历史位置", "百日位置", "盈利比例"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         stockinfo = filename.split('.')[0]
@@ -290,20 +325,6 @@ def block_Model_Select():
                 block_list[ii][0] = stockinfo
         if(block_list!=[]):
             write_csvfile(os.path.join(blockdata_path, filename), block_title, block_list)
-            _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
-            block_list[0][1] = block_list[0][1][0:4] + '-' + block_list[0][1][4:6] + '-' + block_list[0][1][6:8]
-            for jj in range(len(stockdata_list)):
-                if(stockdata_list[jj][0]==block_list[0][1]):
-                    blockoffset = jj
-                    break
-            closingprice_list = [float(item[3]) for item in stockdata_list[:(blockoffset+1)]]
-            convpre1 = (float(block_list[0][2])/closingprice_list[0]-1)*100
-            convpre2 = (float(block_list[0][2])/closingprice_list[blockoffset]-1)*100
-            volumnratio1 = (float(block_list[0][4])*10000/float(stockdata_list[blockoffset][11]))
-            tradevolumn = volumnratio1*float(stockdata_list[blockoffset][10])
-            volumnratio2 = tradevolumn/float(stockdata_list[0][10])
-            riserange = (max(closingprice_list)/closingprice_list[blockoffset]-1)*100
-            failrange = (min(closingprice_list)/closingprice_list[blockoffset]-1)*100
             _, EHBFdata_list = read_csvfile(EHBFfile_path)
             earnratio = "-1"
             reboundrange1 = "-1"
@@ -313,7 +334,24 @@ def block_Model_Select():
                     reboundrange1 = EHBFitem[5]
                     reboundrange2 = EHBFitem[6]
                     earnratio = EHBFitem[9]
-            resultdata_list.append([stockinfo, stockdata_list[blockoffset][0], convpre1, convpre2, riserange, failrange, tradevolumn, volumnratio1, volumnratio2, block_list[ii][4], block_list[ii][5], block_list[ii][6], reboundrange1, reboundrange2, earnratio])
+                    stockinfo = EHBFitem[0]
+                    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, "{}.csv".format(stockinfo)))
+                    modeldate = block_list[0][1][0:4] + '-' + block_list[0][1][4:6] + '-' + block_list[0][1][6:8]
+                    modeloffset = len(stockdata_list)-1
+                    for jj in range(len(stockdata_list)):
+                        if(stockdata_list[jj][0]<=modeldate):
+                            modeloffset = jj
+                            break
+                    closingprice_list = [float(item[3]) for item in stockdata_list[:(modeloffset+1)]]
+                    convpre1 = (float(block_list[0][2])/closingprice_list[0]-1)*100
+                    convpre2 = (float(block_list[0][2])/closingprice_list[modeloffset]-1)*100
+                    volumnratio1 = (float(block_list[0][4])*10000/float(stockdata_list[modeloffset][11]))
+                    tradevolumn = volumnratio1*float(stockdata_list[modeloffset][10])
+                    volumnratio2 = tradevolumn/float(stockdata_list[0][10])
+                    riserange = (max(closingprice_list)/closingprice_list[modeloffset]-1)*100
+                    failrange = (min(closingprice_list)/closingprice_list[modeloffset]-1)*100
+                    modelrange = (closingprice_list[0]/closingprice_list[modeloffset]-1)*100
+                    resultdata_list.append([stockinfo, stockdata_list[modeloffset][0], convpre1, convpre2, riserange, failrange, modelrange, tradevolumn, volumnratio1, volumnratio2, block_list[0][4], block_list[0][5], block_list[0][6], reboundrange1, reboundrange2, earnratio])
     write_csvfile(resultfile_path, title, resultdata_list)
 
 
