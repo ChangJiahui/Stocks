@@ -2919,14 +2919,14 @@ def lagging_Model_Select():
     index_list = ["上证指数_0000001", "深证成指_1399001"]
     indexfile_list = [os.path.join(indexdata_path, (item+".csv")) for item in index_list]
     resultfile_path = os.path.join(resultdata_path, "lagging_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "股票总涨跌幅", "指数总涨跌幅", "股票总滞后幅", "总股票滞后天数", "百日最大连续滞后幅", "百日最大滞后天数", "30日总滞后幅", "30日滞后天数", "60日总滞后幅", "60日滞后天数", "100日总滞后幅", "100日滞后天数", "200日总滞后幅", "200日滞后天数", "500日总滞后幅", "500日滞后天数"]
+    title = ["股票名称", "当日涨跌幅", "股票总涨跌幅", "指数总涨跌幅", "股票总滞后幅", "总股票滞后天数", "千日最大连续滞后幅", "千日最大滞后天数", "30日总滞后幅", "30日滞后天数", "60日总滞后幅", "60日滞后天数", "100日总滞后幅", "100日滞后天数", "200日总滞后幅", "200日滞后天数", "500日总滞后幅", "500日滞后天数"]
     resultdata_list = []
     for filename in os.listdir(stockdata_path):
         resultdata_list.append(lagging_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
 def lagging_Model_Select_par():
     resultfile_path = os.path.join(resultdata_path, "lagging_Model_Select_Result.csv")
-    title = ["股票名称", "当日涨跌幅", "股票总涨跌幅", "指数总涨跌幅", "股票总滞后幅", "总股票滞后天数", "百日最大连续滞后幅", "百日最大滞后天数", "30日总滞后幅", "30日滞后天数", "60日总滞后幅", "60日滞后天数", "100日总滞后幅", "100日滞后天数", "200日总滞后幅", "200日滞后天数", "500日总滞后幅", "500日滞后天数"]
+    title = ["股票名称", "当日涨跌幅", "股票总涨跌幅", "指数总涨跌幅", "股票总滞后幅", "总股票滞后天数", "千日最大连续滞后幅", "千日最大滞后天数", "30日总滞后幅", "30日滞后天数", "60日总滞后幅", "60日滞后天数", "100日总滞后幅", "100日滞后天数", "200日总滞后幅", "200日滞后天数", "500日总滞后幅", "500日滞后天数"]
     pool = multiprocessing.Pool(4)
     resultdata_list = pool.map(lagging_Model_Select_pipeline, os.listdir(stockdata_path))
     pool.close()
@@ -2956,9 +2956,9 @@ def lagging_Model_Select_pipeline(filename):
             comdata_list.append([stockdata_list[offset1][0], stockdata_list[offset1][3], stockdata_list[offset1][9], indexdata_list[offset2][3], indexdata_list[offset2][9], float(stockdata_list[offset1][3])/float(indexdata_list[offset2][3])])
             offset1+=1
             offset2+=1
-        if(offset1==min(510,len(stockdata_list))):
+        if(offset1==min(2010,len(stockdata_list))):
             break
-        if(offset2==min(510,len(indexdata_list))):
+        if(offset2==min(2010,len(indexdata_list))):
             break
     N1 = 12
     N2 = 26
@@ -2981,10 +2981,10 @@ def lagging_Model_Select_pipeline(filename):
         lagging500counter, lagging500range = lagging_calc(comdata_list, 500)
         maxlaggingcounter = 0
         maxlaggingrange = 0
-        for ii in range(laggingcounter, min(100, len(comdata_list)-1)):
+        for ii in range(laggingcounter, min(1000, len(comdata_list)-1)):
             templaggingcounter = 0
             templaggingrange = 0
-            for jj in range(ii, min(200, len(comdata_list)-1)):
+            for jj in range(ii, min(2000, len(comdata_list)-1)):
                 if((MACD_list[jj]<0) or (DIFF_list[jj]<0)):
                     templaggingcounter += 1
                 else:
@@ -2996,6 +2996,86 @@ def lagging_Model_Select_pipeline(filename):
                     maxlaggingcounter=templaggingcounter
         if((laggingcounter>maxlaggingcounter/2) and (laggingrange>maxlaggingrange*2/3)):
             return [stockinfo, comdata_list[0][2], stockrange, comrange, laggingrange, laggingcounter, maxlaggingrange, maxlaggingcounter, lagging30range, lagging30counter, lagging60range, lagging60counter, lagging100range, lagging100counter, lagging200range, lagging200counter, lagging500range, lagging500counter]
+    return []
+
+
+def laggingser_Model_Select():
+# 与指数 相比滞后幅度
+    index_list = ["上证指数_0000001", "深证成指_1399001"]
+    indexfile_list = [os.path.join(indexdata_path, (item+".csv")) for item in index_list]
+    resultfile_path = os.path.join(resultdata_path, "laggingser_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "股票总涨跌幅", "指数总涨跌幅", "股票总滞后幅", "总股票滞后天数", "百日最大连续滞后幅", "百日最大滞后天数", "30日总滞后幅", "30日滞后天数", "60日总滞后幅", "60日滞后天数", "100日总滞后幅", "100日滞后天数", "200日总滞后幅", "200日滞后天数", "500日总滞后幅", "500日滞后天数"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(laggingser_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def laggingser_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "laggingser_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "股票总涨跌幅", "指数总涨跌幅", "股票总滞后幅", "总股票滞后天数", "百日最大连续滞后幅", "百日最大滞后天数", "30日总滞后幅", "30日滞后天数", "60日总滞后幅", "60日滞后天数", "100日总滞后幅", "100日滞后天数", "200日总滞后幅", "200日滞后天数", "500日总滞后幅", "500日滞后天数"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(laggingser_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def laggingser_Model_Select_pipeline(filename):
+    index_list = ["上证指数_0000001", "深证成指_1399001"]
+    indexfile_list = [os.path.join(indexdata_path, (item+".csv")) for item in index_list]
+    stockinfo = filename.split(".")[0]
+    if(stockinfo.split('_')[-1][0]=="0"):
+        indexfile = indexfile_list[0]
+    else:
+        indexfile = indexfile_list[1]
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    _, indexdata_list = read_csvfile(indexfile)
+    offset1 = 0
+    offset2 = 0
+    comdata_list = []
+    while(True):
+        if(stockdata_list[offset1][0]>indexdata_list[offset2][0]):
+            comdata_list.append([stockdata_list[offset1][0], stockdata_list[offset1][3], stockdata_list[offset1][9], indexdata_list[offset2][3], 0, float(stockdata_list[offset1][3])/float(indexdata_list[offset2][3])])
+            offset1+=1
+        elif(stockdata_list[offset1][0]<indexdata_list[offset2][0]):
+            comdata_list.append([indexdata_list[offset2][0], stockdata_list[offset1][3], 0, indexdata_list[offset2][3], indexdata_list[offset2][9], float(stockdata_list[offset1][3])/float(indexdata_list[offset2][3])])
+            offset2+=1
+        else:
+            comdata_list.append([stockdata_list[offset1][0], stockdata_list[offset1][3], stockdata_list[offset1][9], indexdata_list[offset2][3], indexdata_list[offset2][9], float(stockdata_list[offset1][3])/float(indexdata_list[offset2][3])])
+            offset1+=1
+            offset2+=1
+        if(offset1==min(510,len(stockdata_list))):
+            break
+        if(offset2==min(510,len(indexdata_list))):
+            break
+    laggingcounter = 0
+    for ii in range(len(comdata_list)):
+        if(float(comdata_list[ii][2])<float(comdata_list[ii][4])):
+            laggingcounter += 1
+        else:
+            break
+    stockrange = (float(comdata_list[0][1])/float(comdata_list[laggingcounter][1])-1)*100
+    comrange = (float(comdata_list[0][3])/float(comdata_list[laggingcounter][3])-1)*100
+    laggingrange = comrange - stockrange
+    lagging30counter, lagging30range = lagging_calc(comdata_list, 30)
+    lagging60counter, lagging60range = lagging_calc(comdata_list, 60)
+    lagging100counter, lagging100range = lagging_calc(comdata_list, 100)
+    lagging200counter, lagging200range = lagging_calc(comdata_list, 200)
+    lagging500counter, lagging500range = lagging_calc(comdata_list, 500)
+    maxlaggingcounter = 0
+    maxlaggingrange = 0
+    for ii in range(laggingcounter, min(100, len(comdata_list)-1)):
+        templaggingcounter = 0
+        templaggingrange = 0
+        for jj in range(ii, min(200, len(comdata_list)-1)):
+            if(float(comdata_list[jj][2])<float(comdata_list[jj][4])):
+                templaggingcounter += 1
+            else:
+                break
+            templaggingrange = (float(comdata_list[ii][3])/float(comdata_list[ii+templaggingcounter][3])-1)*100-(float(comdata_list[ii][1])/float(comdata_list[ii+templaggingcounter][1])-1)*100
+            if(maxlaggingrange<templaggingrange):
+                maxlaggingrange=templaggingrange
+            if(maxlaggingcounter<templaggingcounter):
+                maxlaggingcounter=templaggingcounter
+    if((laggingcounter>maxlaggingcounter/2) and (laggingrange>maxlaggingrange*2/3)):
+        return [stockinfo, comdata_list[0][2], stockrange, comrange, laggingrange, laggingcounter, maxlaggingrange, maxlaggingcounter, lagging30range, lagging30counter, lagging60range, lagging60counter, lagging100range, lagging100counter, lagging200range, lagging200counter, lagging500range, lagging500counter]
     return []
     
 
@@ -4649,6 +4729,10 @@ def analyze_stockdata():
     lagging_Model_Select()
 #    lagging_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tlagging_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tlaggingser_Model_Select Begin!")
+    laggingser_Model_Select()
+#    laggingser_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tlaggingser_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tvolumnMonth_Model_Select Begin!")
     volumnMonth_Model_Select()
 #    volumnMonth_Model_Select_par()
