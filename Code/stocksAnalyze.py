@@ -970,6 +970,94 @@ def RSRS_Model_Select_pipeline(filename):
     return []
 
 
+def slope_Model_Select():
+# slope + wave 模型
+    resultfile_path = os.path.join(resultdata_path, "slope_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "10日涨跌幅", "最近10日最大下跌幅度", "最近10日最大上涨幅度", "最近下跌幅度", "最近下跌天数", "最近上涨幅度", "最近上涨天数", "上一下跌幅度", "上一下跌天数", "上一上涨幅度", "上一上涨天数", "上二下跌幅度", "上二下跌天数", "上二上涨幅度", "上二上涨天数"]
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(slope_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+def slope_Model_Select_par():
+    resultfile_path = os.path.join(resultdata_path, "slope_Model_Select_Result.csv")
+    title = ["股票名称", "当日涨跌幅", "10日涨跌幅", "最近10日最大下跌幅度", "最近10日最大上涨幅度", "最近下跌幅度", "最近下跌天数", "最近上涨幅度", "最近上涨天数", "上一下跌幅度", "上一下跌天数", "上一上涨幅度", "上一上涨天数", "上二下跌幅度", "上二下跌天数", "上二上涨幅度", "上二上涨天数"]
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(slope_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+def slope_Model_Select_pipeline(filename):
+    N = 10
+    rounddaynum = 30
+    _, stockdata_list = read_csvfile(os.path.join(stockdata_path, filename))
+    stockinfo = filename.split(".")[0]
+    closingprice = float(stockdata_list[0][3])
+    perioddaynum = min(1000, len(stockdata_list)-N)
+    if(perioddaynum<300):
+        return []
+    closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N]]
+    slope_list = [0]*perioddaynum
+    for ii in range(perioddaynum):
+        slope_list[ii] = (closingprice_list[ii]/closingprice_list[ii+N-1]-1)*100
+    minprice_list = []
+    minslope_list = []
+    minoffset_list = []
+    maxprice_list = []
+    maxslope_list = []
+    maxoffset_list = []
+    startoffset = perioddaynum-1
+    for ii in range(perioddaynum):
+        if(slope_list[ii]==min([slope_list[kk] for kk in range(max(0,ii-rounddaynum),min(perioddaynum,ii+rounddaynum+1))])):
+            minprice_list.append(closingprice_list[ii])
+            minslope_list.append(slope_list[ii])
+            minoffset_list.append(ii)
+            startoffset = ii
+            isDrop=True
+            break
+        if(slope_list[ii]==max([slope_list[kk] for kk in range(max(0,ii-rounddaynum),min(perioddaynum,ii+rounddaynum+1))])):
+            return []
+    for ii in range(startoffset+1, perioddaynum):
+        tempmaxslope = max([slope_list[kk] for kk in range(max(0,ii-rounddaynum),min(perioddaynum,ii+rounddaynum+1))])
+        tempminslope = min([slope_list[kk] for kk in range(max(0,ii-rounddaynum),min(perioddaynum,ii+rounddaynum+1))])
+        if(isDrop):
+            if(slope_list[ii]==tempmaxslope):
+                maxprice_list.append(closingprice_list[ii])
+                maxslope_list.append(slope_list[ii])
+                maxoffset_list.append(ii)
+                isDrop=False
+            elif((slope_list[ii]==tempminslope) and (slope_list[ii]<minslope_list[-1])):
+                minprice_list[-1] = closingprice_list[ii]
+                minslope_list[-1] = slope_list[ii]
+                minoffset_list[-1] = ii
+        else:
+            if(slope_list[ii]==tempminslope):
+                minprice_list.append(closingprice_list[ii])
+                minslope_list.append(slope_list[ii])
+                minoffset_list.append(ii)
+                isDrop=True
+            elif((slope_list[ii]==tempmaxslope) and (slope_list[ii]>maxslope_list[-1])):
+                maxprice_list[-1] = closingprice_list[ii]
+                maxslope_list[-1] = slope_list[ii]
+                maxoffset_list[-1] = ii
+    if((len(minprice_list)>3) and (len(maxprice_list)>3)):
+        reboundcounter = minoffset_list[0]
+        reboundrange = (closingprice/minprice_list[0]-1)*100
+        failcounter = maxoffset_list[0]-minoffset_list[0]
+        failrange = (minprice_list[0]/maxprice_list[0]-1)*100
+        lastreboundcounter = minoffset_list[1]-maxoffset_list[0]
+        lastreboundrange = (maxprice_list[0]/minprice_list[1]-1)*100
+        lastfailcounter = maxoffset_list[1]-minoffset_list[1]
+        lastfailrange = (minprice_list[1]/maxprice_list[1]-1)*100
+        penultreboundcounter = minoffset_list[2]-maxoffset_list[1]
+        penultreboundrange = (maxprice_list[1]/minprice_list[2]-1)*100
+        penultfailcounter = maxoffset_list[2]-minoffset_list[2]
+        penultfailrange = (minprice_list[2]/maxprice_list[2]-1)*100
+        sumrange = reboundrange+failrange+lastreboundrange+lastfailrange+penultreboundrange+penultfailrange
+        if((reboundrange<20) and (reboundcounter>3) and (sumrange<-10)):
+            return [stockinfo, stockdata_list[0][9], slope_list[0], slope_list[minoffset_list[0]], slope_list[maxoffset_list[0]], reboundrange, reboundcounter, failrange, failcounter, lastreboundrange, lastreboundcounter, lastfailrange, lastfailcounter, penultreboundrange, penultreboundcounter, penultfailrange, penultfailcounter]
+    return []
+
+
 def OBV_Model_Select():
 # 累计成交量模型
     resultfile_path = os.path.join(resultdata_path, "OBV_Model_Select_Result.csv")
@@ -1873,6 +1961,13 @@ def trend_Model_Select():
         resultdata_list.append(trend1T10_Model_Select_pipeline(filename))
     write_csvfile(resultfile_path, title, resultdata_list)
 
+    title = ["股票名称", "当日涨跌幅", "1日线上穿预测天数", "30日线下方天数", "股票上穿前总跌幅", "DIFF", "DIFF比例", "日线交叉涨跌幅", "日线趋势涨跌幅", "日线平行涨跌幅", "百日最大下方天数", "百日最大上穿前跌幅", "百日最大DIFF", "日期", "百日最大DIFF比例", "日期"]
+    resultfile_path = os.path.join(resultdata_path, "trend1T30_Model_Select_Result.csv")
+    resultdata_list = []
+    for filename in os.listdir(stockdata_path):
+        resultdata_list.append(trend1T30_Model_Select_pipeline(filename))
+    write_csvfile(resultfile_path, title, resultdata_list)
+
     title = ["股票名称", "当日涨跌幅", "5日线上穿预测天数", "10日线下方天数", "股票上穿前总跌幅", "DIFF", "DIFF比例", "日线交叉涨跌幅", "日线趋势涨跌幅", "日线平行涨跌幅", "百日最大下方天数", "百日最大上穿前跌幅", "百日最大DIFF", "日期", "百日最大DIFF比例", "日期"]
     resultfile_path = os.path.join(resultdata_path, "trend5T10_Model_Select_Result.csv")
     resultdata_list = []
@@ -1903,6 +1998,14 @@ def trend_Model_Select_par():
     pool.join()
     write_csvfile(resultfile_path, title, resultdata_list)
 
+    title = ["股票名称", "当日涨跌幅", "1日线上穿预测天数", "30日线下方天数", "股票上穿前总跌幅", "DIFF", "DIFF比例", "日线交叉涨跌幅", "日线趋势涨跌幅", "日线平行涨跌幅", "百日最大下方天数", "百日最大上穿前跌幅", "百日最大DIFF", "日期", "百日最大DIFF比例", "日期"]
+    resultfile_path = os.path.join(resultdata_path, "trend1T30_Model_Select_Result.csv")
+    pool = multiprocessing.Pool(4)
+    resultdata_list = pool.map(trend1T30_Model_Select_pipeline, os.listdir(stockdata_path))
+    pool.close()
+    pool.join()
+    write_csvfile(resultfile_path, title, resultdata_list)
+
     title = ["股票名称", "当日涨跌幅", "5日线上穿预测天数", "10日线下方天数", "股票上穿前总跌幅", "DIFF", "DIFF比例", "日线交叉涨跌幅", "日线趋势涨跌幅", "日线平行涨跌幅", "百日最大下方天数", "百日最大上穿前跌幅", "百日最大DIFF", "日期", "百日最大DIFF比例", "日期"]
     resultfile_path = os.path.join(resultdata_path, "trend5T10_Model_Select_Result.csv")
     pool = multiprocessing.Pool(4)
@@ -1922,6 +2025,8 @@ def trend1T5_Model_Select_pipeline(filename):
     return trend_Model_Select_pipeline(filename,1,5)
 def trend1T10_Model_Select_pipeline(filename):
     return trend_Model_Select_pipeline(filename,1,10)
+def trend1T30_Model_Select_pipeline(filename):
+    return trend_Model_Select_pipeline(filename,1,30)
 def trend5T10_Model_Select_pipeline(filename):
     return trend_Model_Select_pipeline(filename,5,10)
 def trend10T30_Model_Select_pipeline(filename):
@@ -4693,6 +4798,10 @@ def analyze_stockdata():
     RSRS_Model_Select()
 #    RSRS_Model_Select_par()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tRSRS_Model_Select Finished!")
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tslope_Model_Select Begin!")
+    slope_Model_Select()
+#    slope_Model_Select_par()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tslope_Model_Select Finished!")
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + ":\tOBV_Model_Select Begin!")
     OBV_Model_Select()
 #    OBV_Model_Select_par()

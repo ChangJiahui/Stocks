@@ -286,6 +286,8 @@ def EHBF_Analyze_pipeline(filename):
     fundinfo = filename[:filename.rfind(".")]
     closingprice = float(funddata_list[0][6])
     perioddaynum = len(funddata_list)
+    if(perioddaynum<50):
+        return []
     closingprice_list = [float(item[6]) for item in funddata_list[:perioddaynum]]
     maxprice = max(closingprice_list)
     minprice = min(closingprice_list)
