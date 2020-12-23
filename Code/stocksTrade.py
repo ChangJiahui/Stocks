@@ -2,6 +2,7 @@ import os
 import csv
 import tushare as ts
 import tunet
+import urllib
 import time
 import math
 import numpy as np
@@ -701,6 +702,37 @@ def trade_analyze():
                 break
         return strvar
 
+
+    def slope_Model_Trade_pipeline(stockdata_list):
+    # slope + wave 模型
+        strvar = ""
+        N = 10
+        rounddaynum = 30
+        closingprice = float(stockdata_list[0][3])
+        perioddaynum = min(1000, len(stockdata_list)-N)
+        if(perioddaynum<300):
+            return strvar
+        closingprice_list = [float(item[3]) for item in stockdata_list[:perioddaynum+N]]
+        slope_list = [0]*perioddaynum
+        for ii in range(perioddaynum):
+            slope_list[ii] = (closingprice_list[ii]/closingprice_list[ii+N-1]-1)*100
+        minprice_list = []
+        minslope_list = []
+        minoffset_list = []
+        maxprice_list = []
+        maxslope_list = []
+        maxoffset_list = []
+        startoffset = perioddaynum-1
+        for ii in range(perioddaynum):
+            if(slope_list[ii]==min([slope_list[kk] for kk in range(max(0,ii-rounddaynum),min(perioddaynum,ii+rounddaynum+1))])):
+                strvar = "\t大跌后买入信号 买入价格: " + str(round(closingprice_list[0],2)) + "\n"
+                break
+            if(slope_list[ii]==max([slope_list[kk] for kk in range(max(0,ii-rounddaynum),min(perioddaynum,ii+rounddaynum+1))])):
+                strvar = "\t大涨后卖出信号 卖出价格: " + str(round(closingprice_list[0],2)) + "\n"
+                break
+        return strvar
+
+
     resultstr = ""
     index_list = ["上证指数_0000001", "深证成指_1399001"]
     for ii in range(len(index_list)):
@@ -719,7 +751,8 @@ def trade_analyze():
                               + trend1T5_Model_Select_pipeline(indexdata_list) \
                               + amptrend_Model_Trade_pipeline(indexdata_list) \
                               + stdtrend_Model_Trade_pipeline(indexdata_list) \
-                              + RSRS_Model_Trade_pipeline(indexdata_list)
+                              + RSRS_Model_Trade_pipeline(indexdata_list) \
+                              + slope_Model_Trade_pipeline(indexdata_list)
     title, trade_list = read_csvfile(accountbook_path)
 #    title = ["股票名称", "成本价格", "持仓数量", "最近交易价格", "最近交易数量", "低位价格", "高位价格", "跌3%价格", "涨3%价格", "当前价格", "持仓市值", "最近交易市值", "盈利比例"]
     for ii in range(len(trade_list)):
@@ -751,7 +784,8 @@ def trade_analyze():
                                   + amptrend_Model_Trade_pipeline(stockdata_list) \
                                   + stdtrend_Model_Trade_pipeline(stockdata_list) \
                                   + point_Model_Trade_pipeline(trade_list[ii], stockdata_list) \
-                                  + RSRS_Model_Trade_pipeline(stockdata_list)
+                                  + RSRS_Model_Trade_pipeline(stockdata_list) \
+                                  + slope_Model_Trade_pipeline(stockdata_list)
         else:
             resultstr = stockinfo + " 股票名称错误!" + '\n' + resultstr
             trade_list[ii][7:13] = [0]*6
