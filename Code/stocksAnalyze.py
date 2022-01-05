@@ -220,13 +220,13 @@ def get_stockinfo():
             else:
                 break
         return stockdict_list
-    HS300_url = "http://www.csindex.com.cn/uploads/file/autofile/cons/000300cons.xls"
+    HS300_url = "https://csi-web-dev.oss-cn-shanghai-finance-1-pub.aliyuncs.com/static/html/csindex/public/uploads/file/autofile/cons/000300cons.xls"
     HS300_filepath = os.path.join(root_path, "Data", "HS300.xls")
-    CSI500_url = "http://www.csindex.com.cn/uploads/file/autofile/cons/000905cons.xls"
+    CSI500_url = "https://csi-web-dev.oss-cn-shanghai-finance-1-pub.aliyuncs.com/static/html/csindex/public/uploads/file/autofile/cons/000905cons.xls"
     CSI500_filepath = os.path.join(root_path, "Data", "CSI500.xls")
-    CSI1000_url = "http://www.csindex.com.cn/uploads/file/autofile/cons/000852cons.xls"
+    CSI1000_url = "https://csi-web-dev.oss-cn-shanghai-finance-1-pub.aliyuncs.com/static/html/csindex/public/uploads/file/autofile/cons/000852cons.xls"
     CSI1000_filepath = os.path.join(root_path, "Data", "CSI1000.xls")
-    CSIAll_url = "http://www.csindex.com.cn/uploads/file/autofile/cons/000902cons.xls"
+    CSIAll_url = "https://csi-web-dev.oss-cn-shanghai-finance-1-pub.aliyuncs.com/static/html/csindex/public/uploads/file/autofile/cons/000902cons.xls"
     CSIAll_filepath = os.path.join(root_path, "Data", "CSIAll.xls")
     CSIAll_list = get_indexcomponent("CSIAll", CSIAll_url, CSIAll_filepath, 3000)
     CSI1000_list = get_indexcomponent("CSI1000", CSI1000_url, CSI1000_filepath, 950)
